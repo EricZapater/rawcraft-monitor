@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mockup: Inici de Sessió i Contrasenya — Rawcraft Monitor</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;500&family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #1976d2;
+      --primary-dark: #115293;
+      --primary-light: #e3f2fd;
+      --text-primary: #1e293b;
+      --text-secondary: #64748b;
+      --bg-body: #0f172a;
+      --bg-card: #ffffff;
+      --border-color: #e2e8f0;
+      --radius: 8px;
+      --success: #2e7d32;
+      --success-bg: #edf7ed;
+      --error: #d32f2f;
+      --error-bg: #fde8e8;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Roboto', -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-body);
+      color: var(--text-primary);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    /* State Switcher flotant */
+    .state-bar {
+      position: fixed;
+      top: 16px;
+      right: 20px;
+      z-index: 1000;
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 30px;
+      padding: 4px 8px;
+      display: flex;
+      gap: 4px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+    }
+
+    .state-btn {
+      background: transparent;
+      border: none;
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 500;
+      color: #94a3b8;
+      cursor: pointer;
+    }
+
+    .state-btn.active {
+      background: var(--primary);
+      color: #ffffff;
+    }
+
+    .login-card {
+      background: var(--bg-card);
+      width: 100%;
+      max-width: 420px;
+      border-radius: 12px;
+      border: 1px solid var(--border-color);
+      padding: 36px 32px;
+    }
+
+    .brand-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+
+    .brand-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 8px;
+      background: var(--primary);
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Roboto Mono', monospace;
+      font-weight: 700;
+      font-size: 18px;
+    }
+
+    .brand-title {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+
+    .brand-subtitle {
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    .form-title {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+
+    .form-desc {
+      font-size: 13px;
+      color: var(--text-secondary);
+      margin-bottom: 20px;
+    }
+
+    .alert-error {
+      background: var(--error-bg);
+      color: var(--error);
+      border: 1px solid #f8b4b4;
+      border-left: 4px solid var(--error);
+      padding: 12px 14px;
+      border-radius: 6px;
+      font-size: 13px;
+      margin-bottom: 18px;
+      display: none;
+    }
+
+    .alert-success {
+      background: var(--success-bg);
+      color: var(--success);
+      border: 1px solid #b7dfb9;
+      border-left: 4px solid var(--success);
+      padding: 12px 14px;
+      border-radius: 6px;
+      font-size: 13px;
+      margin-bottom: 18px;
+      display: none;
+    }
+
+    .form-group {
+      margin-bottom: 16px;
+    }
+
+    .form-label {
+      display: block;
+      font-size: 13px;
+      font-weight: 500;
+      margin-bottom: 6px;
+      color: var(--text-primary);
+    }
+
+    .form-input {
+      width: 100%;
+      padding: 10px 14px;
+      font-size: 14px;
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius);
+      outline: none;
+    }
+
+    .form-input:focus {
+      border-color: var(--primary);
+    }
+
+    .btn-primary {
+      width: 100%;
+      background: var(--primary);
+      color: #ffffff;
+      border: none;
+      padding: 11px 18px;
+      border-radius: var(--radius);
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      margin-top: 8px;
+    }
+
+    .security-note {
+      margin-top: 20px;
+      padding-top: 16px;
+      border-top: 1px solid var(--border-color);
+      font-size: 12px;
+      color: var(--text-secondary);
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="state-bar">
+    <button class="state-btn active" onclick="setMode('happy', this)">1. Login (Happy Path)</button>
+    <button class="state-btn" onclick="setMode('error', this)">2. Error 401 (Credencials / Inactiu)</button>
+    <button class="state-btn" onclick="setMode('password', this)">3. Canvi de Contrasenya Pròpia (HU-USR-04)</button>
+  </div>
+
+  <!-- Vista Login (HU-USR-01) -->
+  <div id="login-view" class="login-card">
+    <div class="brand-header">
+      <div class="brand-icon">&gt;_</div>
+      <div>
+        <div class="brand-title">Rawcraft Monitor</div>
+        <div class="brand-subtitle">Punt Central de Telemetria i Alertes</div>
+      </div>
+    </div>
+
+    <h1 class="form-title">Inicia sessió</h1>
+    <p class="form-desc">Introdueix les teves credencials per accedir als servidors autoritzats.</p>
+
+    <div id="login-error" class="alert-error">
+      <strong>Error 401:</strong> Credencials invàlides o compte d'usuari inactiu.
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Correu electrònic</label>
+      <input type="email" class="form-input" value="eric@rawcraft.cat">
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Contrasenya</label>
+      <input type="password" class="form-input" value="••••••••••••">
+    </div>
+
+    <button class="btn-primary">Entrar al Panell</button>
+
+    <div class="security-note">
+      Accés restringit. Sense registre públic obert — contacta amb l'administrador per donar d'alta el teu usuari.
+    </div>
+  </div>
+
+  <!-- Vista Canvi de Contrasenya Pròpia (HU-USR-04) -->
+  <div id="password-view" class="login-card" style="display: none;">
+    <div class="brand-header">
+      <div class="brand-icon">&gt;_</div>
+      <div>
+        <div class="brand-title">Perfil d'Usuari</div>
+        <div class="brand-subtitle">eric@rawcraft.cat • Rol: ADMIN</div>
+      </div>
+    </div>
+
+    <h1 class="form-title">Canviar contrasenya pròpia</h1>
+    <p class="form-desc">Introdueix la contrasenya actual i defineix la nova (mínim 8 caràcters).</p>
+
+    <div id="pwd-success" class="alert-success" style="display: block;">
+      Contrasenya actualitzada correctament.
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Contrasenya actual</label>
+      <input type="password" class="form-input" value="••••••••••••">
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Nova contrasenya</label>
+      <input type="password" class="form-input" value="••••••••••••">
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Confirma la nova contrasenya</label>
+      <input type="password" class="form-input" value="••••••••••••">
+    </div>
+
+    <button class="btn-primary">Actualitzar contrasenya</button>
+  </div>
+
+  <script>
+    function setMode(mode, btn) {
+      document.querySelectorAll('.state-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const loginView = document.getElementById('login-view');
+      const pwdView = document.getElementById('password-view');
+      const loginError = document.getElementById('login-error');
+
+      if (mode === 'happy') {
+        loginView.style.display = 'block';
+        pwdView.style.display = 'none';
+        loginError.style.display = 'none';
+      } else if (mode === 'error') {
+        loginView.style.display = 'block';
+        pwdView.style.display = 'none';
+        loginError.style.display = 'block';
+      } else if (mode === 'password') {
+        loginView.style.display = 'none';
+        pwdView.style.display = 'block';
+      }
+    }
+  </script>
+</body>
+</html>

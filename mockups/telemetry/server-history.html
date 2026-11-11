@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mockup: Històric, Gràfiques i Retenció 365 Dies — Rawcraft Monitor</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;500&family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #1976d2;
+      --primary-light: #e3f2fd;
+      --text-primary: #1e293b;
+      --text-secondary: #64748b;
+      --bg-body: #f1f5f9;
+      --bg-card: #ffffff;
+      --border-color: #e2e8f0;
+      --sidebar-width: 240px;
+      --header-height: 64px;
+      --radius: 8px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Roboto', sans-serif; }
+    body { background: var(--bg-body); color: var(--text-primary); min-height: 100vh; display: flex; }
+
+    .state-bar {
+      position: fixed;
+      top: 12px;
+      right: 20px;
+      z-index: 1000;
+      background: #1e293b;
+      border-radius: 30px;
+      padding: 4px 8px;
+      display: flex;
+      gap: 4px;
+    }
+    .state-btn {
+      background: transparent;
+      border: none;
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 500;
+      color: #94a3b8;
+      cursor: pointer;
+    }
+    .state-btn.active { background: var(--primary); color: #fff; }
+
+    .sidebar {
+      width: var(--sidebar-width);
+      background: #fff;
+      border-right: 1px solid var(--border-color);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+    }
+    .sidebar-brand {
+      height: var(--header-height);
+      display: flex;
+      align-items: center;
+      padding: 0 20px;
+      gap: 10px;
+      border-bottom: 1px solid var(--border-color);
+      font-weight: 700;
+    }
+    .brand-icon {
+      width: 30px;
+      height: 30px;
+      border-radius: 6px;
+      background: var(--primary);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Roboto Mono', monospace;
+    }
+    .nav-list { list-style: none; padding: 16px 12px; display: flex; flex-direction: column; gap: 4px; }
+    .nav-item a {
+      display: flex;
+      align-items: center;
+      padding: 10px 14px;
+      border-radius: var(--radius);
+      color: var(--text-secondary);
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 500;
+    }
+    .nav-item.active a { background: var(--primary-light); color: var(--primary); font-weight: 600; }
+
+    .main-wrapper { flex: 1; display: flex; flex-direction: column; }
+    .topbar {
+      height: var(--header-height);
+      background: #fff;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 32px;
+    }
+    .content-area { padding: 24px 32px; max-width: 1280px; width: 100%; }
+
+    .toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+    .range-group {
+      display: inline-flex;
+      background: #fff;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .range-btn {
+      background: transparent;
+      border: none;
+      border-right: 1px solid var(--border-color);
+      padding: 8px 14px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+    }
+    .range-btn.active { background: var(--primary); color: #fff; }
+
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
+    .card { background: #fff; border: 1px solid var(--border-color); border-radius: 10px; padding: 18px 20px; }
+    .card-title { font-size: 14px; font-weight: 700; margin-bottom: 12px; display: flex; justify-content: space-between; }
+
+    .chart-svg { width: 100%; height: 150px; background: #f8fafc; border-radius: 6px; border: 1px solid var(--border-color); }
+
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.5);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 500;
+    }
+    .modal-content {
+      background: #fff;
+      border-radius: 12px;
+      width: 100%;
+      max-width: 460px;
+      border: 1px solid var(--border-color);
+      overflow: hidden;
+    }
+    .modal-header { padding: 18px 24px; border-bottom: 1px solid var(--border-color); font-size: 16px; font-weight: 700; }
+    .modal-body { padding: 22px 24px; }
+    .modal-footer { padding: 14px 24px; background: #f8fafc; border-top: 1px solid var(--border-color); display: flex; justify-content: flex-end; gap: 10px; }
+    .btn-primary { background: var(--primary); color: #fff; border: none; padding: 9px 16px; border-radius: 6px; font-size: 13px; font-weight: 500; cursor: pointer; }
+    .btn-secondary { background: #fff; border: 1px solid var(--border-color); padding: 8px 14px; border-radius: 6px; font-size: 13px; cursor: pointer; }
+  </style>
+</head>
+<body>
+
+  <div class="state-bar">
+    <button class="state-btn active" onclick="showHist('charts', this)">1. Gràfiques d'Evolució Històrica (HU-TEL-04)</button>
+    <button class="state-btn" onclick="showHist('retention', this)">2. Configuració Retenció 365 Dies (HU-TEL-05)</button>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <div class="brand-icon">&gt;_</div>
+      <span>Rawcraft Monitor</span>
+    </div>
+    <ul class="nav-list">
+      <li class="nav-item active"><a href="#">Dashboard Servidors</a></li>
+      <li class="nav-item"><a href="#">Alertes</a></li>
+      <li class="nav-item"><a href="#">Inventari & YAML</a></li>
+      <li class="nav-item"><a href="#">Usuaris i Permisos</a></li>
+    </ul>
+  </aside>
+
+  <div class="main-wrapper">
+    <header class="topbar">
+      <div style="font-size: 14px; font-weight: 600;">Històric i Gràfiques Temporals: <code>srv-ovh-prod-01</code></div>
+      <button class="btn-secondary" onclick="showHist('retention', document.querySelectorAll('.state-btn')[1])">Política de Retenció: <strong>365 dies</strong></button>
+    </header>
+
+    <main class="content-area">
+      <div class="toolbar">
+        <div>
+          <h1 style="font-size: 20px; font-weight: 700;">Evolució Temporal de Mètriques</h1>
+          <p style="font-size: 13px; color: var(--text-secondary);">Mostres recollides cada 5 minuts (agregació automàtica per a rangs llargs).</p>
+        </div>
+        <div class="range-group">
+          <button class="range-btn">6h</button>
+          <button class="range-btn active">24h</button>
+          <button class="range-btn">7 dies</button>
+          <button class="range-btn">30 dies</button>
+          <button class="range-btn">365 dies</button>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <!-- Gràfica 1: System Load -->
+        <div class="card">
+          <div class="card-title">
+            <span>System Load (`1m`, `5m`, `15m`)</span>
+            <span style="color: var(--primary); font-family: 'Roboto Mono', monospace;">Actual: 0.15 | Màx 24h: 0.92</span>
+          </div>
+          <svg class="chart-svg" viewBox="0 0 500 140" preserveAspectRatio="none">
+            <line x1="0" y1="30" x2="500" y2="30" stroke="#fecaca" stroke-dasharray="4 4"/>
+            <polyline fill="none" stroke="#1976d2" stroke-width="2.5" points="0,115 60,110 120,95 180,60 240,105 300,112 360,100 420,108 500,114"/>
+          </svg>
+        </div>
+
+        <!-- Gràfica 2: Memòria RAM i Swap -->
+        <div class="card">
+          <div class="card-title">
+            <span>Ús de Memòria RAM (%) i Swap (%)</span>
+            <span style="color: #16a34a; font-family: 'Roboto Mono', monospace;">RAM: 47% | Swap: 19%</span>
+          </div>
+          <svg class="chart-svg" viewBox="0 0 500 140" preserveAspectRatio="none">
+            <polyline fill="none" stroke="#16a34a" stroke-width="2.5" points="0,78 80,75 160,72 240,68 320,74 400,73 500,74"/>
+            <polyline fill="none" stroke="#d97706" stroke-width="2" points="0,112 100,112 200,110 300,113 400,113 500,113"/>
+          </svg>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <!-- Gràfica 3: Recursos per Contenidor Docker -->
+        <div class="card">
+          <div class="card-title">
+            <span>Consum RAM per Contenidor Docker (MB)</span>
+            <span style="font-family: 'Roboto Mono', monospace; font-size: 12px;">postgres-main (389MB) • traefik (36MB) • nasc (24MB)</span>
+          </div>
+          <svg class="chart-svg" viewBox="0 0 500 140" preserveAspectRatio="none">
+            <polyline fill="none" stroke="#7c3aed" stroke-width="2.5" points="0,58 100,56 200,55 300,57 400,54 500,55"/>
+            <polyline fill="none" stroke="#0284c7" stroke-width="2" points="0,118 100,118 200,117 300,118 400,118 500,118"/>
+          </svg>
+        </div>
+
+        <!-- Gràfica 4: PostgreSQL & Latència Endpoints HTTP -->
+        <div class="card">
+          <div class="card-title">
+            <span>PostgreSQL (% Connexions / Mida BD) & Latència HTTP (ms)</span>
+            <span style="font-family: 'Roboto Mono', monospace; font-size: 12px;">Conn: 14% • BD: 1.38 GB • HTTP: 18 ms</span>
+          </div>
+          <svg class="chart-svg" viewBox="0 0 500 140" preserveAspectRatio="none">
+            <polyline fill="none" stroke="#0f766e" stroke-width="2.5" points="0,115 100,110 200,104 300,112 400,116 500,114"/>
+          </svg>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Modal Configuració Retenció (HU-TEL-05) -->
+  <div id="modal-retention" class="modal-backdrop">
+    <div class="modal-content">
+      <div class="modal-header">Política de Retenció d'Històric (`HU-TEL-05`)</div>
+      <div class="modal-body">
+        <label style="display: block; font-size: 13px; font-weight: 500; margin-bottom: 6px;">Dies de conservació d'històric (`retention_days`)</label>
+        <input type="number" value="365" style="width: 100%; padding: 9px 12px; font-size: 14px; border: 1px solid var(--border-color); border-radius: 6px; margin-bottom: 10px;">
+        <p style="font-size: 12px; color: var(--text-secondary); line-height: 1.5;">
+          Valor inicial per defecte: <strong>365 dies</strong>. Un procés diari al backend del Punt Central purga automàticament les mostres de telemetria i les alertes resoltes amb antiguitat superior a aquest valor.
+        </p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary">Cancel·lar</button>
+        <button class="btn-primary">Desar retenció</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function showHist(mode, btn) {
+      document.querySelectorAll('.state-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('modal-retention').style.display = mode === 'retention' ? 'flex' : 'none';
+    }
+  </script>
+</body>
+</html>

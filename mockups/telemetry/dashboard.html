@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mockup: Dashboard General de Servidors — Rawcraft Monitor</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;500;700&family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #1976d2;
+      --primary-dark: #115293;
+      --primary-light: #e3f2fd;
+      --text-primary: #1e293b;
+      --text-secondary: #64748b;
+      --bg-body: #f1f5f9;
+      --bg-card: #ffffff;
+      --border-color: #e2e8f0;
+      --sidebar-width: 240px;
+      --header-height: 64px;
+      --radius: 8px;
+      --success: #16a34a;
+      --warning: #d97706;
+      --error: #dc2626;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Roboto', sans-serif; }
+    body { background: var(--bg-body); color: var(--text-primary); min-height: 100vh; display: flex; }
+
+    .state-bar {
+      position: fixed;
+      top: 12px;
+      right: 20px;
+      z-index: 1000;
+      background: #1e293b;
+      border-radius: 30px;
+      padding: 4px 8px;
+      display: flex;
+      gap: 4px;
+    }
+    .state-btn {
+      background: transparent;
+      border: none;
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 500;
+      color: #94a3b8;
+      cursor: pointer;
+    }
+    .state-btn.active { background: var(--primary); color: #fff; }
+
+    .sidebar {
+      width: var(--sidebar-width);
+      background: #fff;
+      border-right: 1px solid var(--border-color);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+    }
+    .sidebar-brand {
+      height: var(--header-height);
+      display: flex;
+      align-items: center;
+      padding: 0 20px;
+      gap: 10px;
+      border-bottom: 1px solid var(--border-color);
+      font-weight: 700;
+    }
+    .brand-icon {
+      width: 30px;
+      height: 30px;
+      border-radius: 6px;
+      background: var(--primary);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Roboto Mono', monospace;
+    }
+    .nav-list { list-style: none; padding: 16px 12px; display: flex; flex-direction: column; gap: 4px; }
+    .nav-item a {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 14px;
+      border-radius: var(--radius);
+      color: var(--text-secondary);
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 500;
+    }
+    .nav-item.active a { background: var(--primary-light); color: var(--primary); font-weight: 600; }
+
+    .main-wrapper { flex: 1; display: flex; flex-direction: column; }
+    .topbar {
+      height: var(--header-height);
+      background: #fff;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 32px;
+    }
+    .content-area { padding: 28px 32px; max-width: 1280px; width: 100%; }
+
+    .kpi-strip {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .kpi-card {
+      background: #fff;
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      padding: 16px 20px;
+    }
+    .kpi-label { font-size: 12px; color: var(--text-secondary); text-transform: uppercase; font-weight: 600; }
+    .kpi-val { font-size: 24px; font-weight: 700; margin-top: 4px; }
+
+    .servers-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+    }
+
+    .server-card {
+      background: #fff;
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    .server-card.critical { border-color: #fca5a5; }
+
+    .server-card-header {
+      padding: 18px 22px;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .badge-online { background: #dcfce7; color: #166534; }
+    .badge-critical { background: #fee2e2; color: #991b1b; }
+    .badge-reboot {
+      background: #fef3c7;
+      color: #92400e;
+      border: 1px solid #fde68a;
+      font-size: 11px;
+      padding: 3px 8px;
+      border-radius: 6px;
+      margin-left: 8px;
+    }
+
+    /* Bloc Consola MOTD fidel a l'especificació */
+    .motd-terminal {
+      background: #0f172a;
+      color: #f8fafc;
+      margin: 18px 22px;
+      padding: 16px 18px;
+      border-radius: 8px;
+      font-family: 'Roboto Mono', monospace;
+      font-size: 12.5px;
+      line-height: 1.65;
+    }
+    .motd-header {
+      color: #94a3b8;
+      margin-bottom: 10px;
+      border-bottom: 1px dashed #334155;
+      padding-bottom: 6px;
+    }
+    .motd-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4px 18px;
+    }
+    .motd-key { color: #38bdf8; }
+    .motd-val { color: #f8fafc; font-weight: 500; }
+    .motd-val.warn { color: #fbbf24; }
+    .motd-val.crit { color: #f87171; }
+
+    /* Semàfor de les altres 3 potetes */
+    .pillars-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      padding: 0 22px 18px;
+    }
+    .pillar-box {
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 10px 12px;
+      background: #f8fafc;
+    }
+    .pillar-box.alert {
+      background: #fef2f2;
+      border-color: #fecaca;
+    }
+    .pillar-title {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: var(--text-secondary);
+      margin-bottom: 4px;
+    }
+    .pillar-status {
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .server-card-footer {
+      padding: 12px 22px;
+      background: #f8fafc;
+      border-top: 1px solid var(--border-color);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    .btn-link {
+      color: var(--primary);
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="state-bar">
+    <button class="state-btn active" onclick="setDash('normal', this)">1. Vista General (Happy Path + Reboot badge)</button>
+    <button class="state-btn" onclick="setDash('incident', this)">2. Vista amb Servidor en Alerta (Docker/HTTP KO)</button>
+    <button class="state-btn" onclick="setDash('empty', this)">3. Estat Buit (Sense servidors assignats)</button>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <div class="brand-icon">&gt;_</div>
+      <span>Rawcraft Monitor</span>
+    </div>
+    <ul class="nav-list">
+      <li class="nav-item active"><a href="#">Dashboard Servidors</a></li>
+      <li class="nav-item"><a href="#">Alertes</a></li>
+      <li class="nav-item"><a href="#">Inventari & YAML</a></li>
+      <li class="nav-item"><a href="#">Usuaris i Permisos</a></li>
+    </ul>
+  </aside>
+
+  <div class="main-wrapper">
+    <header class="topbar">
+      <div style="font-size: 13px; color: var(--text-secondary);">Vista en viu dels servidors autoritzats (`HU-TEL-02`)</div>
+      <div style="font-size: 14px; font-weight: 600;">Eric Zapater (ADMIN)</div>
+    </header>
+
+    <main id="dash-main" class="content-area">
+      <div class="kpi-strip">
+        <div class="kpi-card">
+          <div class="kpi-label">Servidors Monitoritzats</div>
+          <div class="kpi-val">2 / 2 Online</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Contenidors Docker</div>
+          <div id="kpi-docker" class="kpi-val" style="color: var(--success);">15 Running</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Endpoints HTTP (200/202)</div>
+          <div id="kpi-http" class="kpi-val" style="color: var(--success);">7 / 7 OK</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Instàncies PostgreSQL</div>
+          <div class="kpi-val" style="color: var(--success);">2 / 2 UP</div>
+        </div>
+      </div>
+
+      <div class="servers-grid">
+        <!-- SERVIDOR 1: srv-ovh-prod-01 -->
+        <div class="server-card">
+          <div class="server-card-header">
+            <div>
+              <div style="display: flex; align-items: center;">
+                <h2 style="font-size: 17px; font-weight: 700;">srv-ovh-prod-01</h2>
+                <span class="badge-reboot">⚠ Reboot required</span>
+              </div>
+              <div style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">
+                Ubuntu 24.04.1 LTS • Kernel 6.8.0-45-generic (x86_64) • Uptime: 42d 11h
+              </div>
+            </div>
+            <span class="badge badge-online">● ONLINE</span>
+          </div>
+
+          <!-- Bloc MOTD idèntic a la petició de l'usuari -->
+          <div class="motd-terminal">
+            <div class="motd-header">System information as of Wed Nov 11 09:13:08 CET 2026</div>
+            <div class="motd-grid">
+              <div><span class="motd-key">System load:</span>  <span class="motd-val">0.15</span></div>
+              <div><span class="motd-key">Processes:</span>             <span class="motd-val">174</span></div>
+              <div><span class="motd-key">Usage of /:</span>   <span class="motd-val">56.4% of 38.60GB</span></div>
+              <div><span class="motd-key">Users logged in:</span>       <span class="motd-val">0</span></div>
+              <div><span class="motd-key">Memory usage:</span> <span class="motd-val">47% (3.76 / 8.00 GB)</span></div>
+              <div><span class="motd-key">IPv4 for ens3:</span>         <span class="motd-val">91.134.91.36</span></div>
+              <div><span class="motd-key">Swap usage:</span>   <span class="motd-val">19% (0.38 / 2.00 GB)</span></div>
+              <div><span class="motd-key">Agent RAM:</span>             <span class="motd-val">9.4 MB / 30 MB</span></div>
+            </div>
+          </div>
+
+          <div class="pillars-row">
+            <div class="pillar-box">
+              <div class="pillar-title">Dockers</div>
+              <div class="pillar-status" style="color: var(--success);">9 running / 0 caiguts</div>
+            </div>
+            <div class="pillar-box">
+              <div class="pillar-title">Endpoints HTTP</div>
+              <div class="pillar-status" style="color: var(--success);">4/4 OK (200/202 • 18ms)</div>
+            </div>
+            <div class="pillar-box">
+              <div class="pillar-title">PostgreSQL</div>
+              <div class="pillar-status" style="color: var(--success);">UP • 14% conn (1.4 GB)</div>
+            </div>
+          </div>
+
+          <div class="server-card-footer">
+            <span>Últim report: fa 42 segons (cicle 5m)</span>
+            <div style="display: flex; gap: 14px;">
+              <a href="#" class="btn-link">Històric & Gràfiques</a>
+              <a href="#" class="btn-link">Veure Detall Complet →</a>
+            </div>
+          </div>
+        </div>
+
+        <!-- SERVIDOR 2: srv-hetzner-02 -->
+        <div id="srv2-card" class="server-card">
+          <div class="server-card-header">
+            <div>
+              <div style="display: flex; align-items: center;">
+                <h2 style="font-size: 17px; font-weight: 700;">srv-hetzner-02</h2>
+              </div>
+              <div style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">
+                Debian GNU/Linux 12 (bookworm) • Kernel 6.1.0-26-amd64 • Uptime: 19d 04h
+              </div>
+            </div>
+            <span id="srv2-badge" class="badge badge-online">● ONLINE</span>
+          </div>
+
+          <div class="motd-terminal">
+            <div class="motd-header">System information as of Wed Nov 11 09:13:05 CET 2026</div>
+            <div class="motd-grid">
+              <div><span class="motd-key">System load:</span>  <span id="srv2-load" class="motd-val">0.42</span></div>
+              <div><span class="motd-key">Processes:</span>             <span class="motd-val">142</span></div>
+              <div><span class="motd-key">Usage of /:</span>   <span class="motd-val">41.2% of 78.20GB</span></div>
+              <div><span class="motd-key">Users logged in:</span>       <span class="motd-val">1</span></div>
+              <div><span class="motd-key">Memory usage:</span> <span id="srv2-mem" class="motd-val">62% (9.92 / 16.0 GB)</span></div>
+              <div><span class="motd-key">IPv4 for eth0:</span>         <span class="motd-val">116.203.44.19</span></div>
+              <div><span class="motd-key">Swap usage:</span>   <span class="motd-val">4% (0.16 / 4.00 GB)</span></div>
+              <div><span class="motd-key">Agent RAM:</span>             <span class="motd-val">8.8 MB / 30 MB</span></div>
+            </div>
+          </div>
+
+          <div class="pillars-row">
+            <div id="srv2-docker-box" class="pillar-box">
+              <div class="pillar-title">Dockers</div>
+              <div id="srv2-docker-txt" class="pillar-status" style="color: var(--success);">6 running / 0 caiguts</div>
+            </div>
+            <div id="srv2-http-box" class="pillar-box">
+              <div class="pillar-title">Endpoints HTTP</div>
+              <div id="srv2-http-txt" class="pillar-status" style="color: var(--success);">3/3 OK (200/202 • 24ms)</div>
+            </div>
+            <div class="pillar-box">
+              <div class="pillar-title">PostgreSQL</div>
+              <div class="pillar-status" style="color: var(--success);">UP • 22% conn (3.8 GB)</div>
+            </div>
+          </div>
+
+          <div class="server-card-footer">
+            <span>Últim report: fa 1 minut (cicle 5m)</span>
+            <div style="display: flex; gap: 14px;">
+              <a href="#" class="btn-link">Històric & Gràfiques</a>
+              <a href="#" class="btn-link">Veure Detall Complet →</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- ESTAT BUIT -->
+    <main id="dash-empty" class="content-area" style="display: none;">
+      <div style="background: #fff; border: 1px solid var(--border-color); border-radius: 12px; padding: 64px 24px; text-align: center;">
+        <h2 style="font-size: 18px; margin-bottom: 8px;">No tens cap servidor assignat</h2>
+        <p style="font-size: 14px; color: var(--text-secondary);">Contacta amb un administrador (`ADMIN`) perquè et doni permés d'accés als servidors que necessitis monitoritzar.</p>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    function setDash(mode, btn) {
+      document.querySelectorAll('.state-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const main = document.getElementById('dash-main');
+      const empty = document.getElementById('dash-empty');
+
+      if (mode === 'empty') {
+        main.style.display = 'none';
+        empty.style.display = 'block';
+        return;
+      }
+      main.style.display = 'block';
+      empty.style.display = 'none';
+
+      const card = document.getElementById('srv2-card');
+      const badge = document.getElementById('srv2-badge');
+      const dBox = document.getElementById('srv2-docker-box');
+      const dTxt = document.getElementById('srv2-docker-txt');
+      const hBox = document.getElementById('srv2-http-box');
+      const hTxt = document.getElementById('srv2-http-txt');
+      const kDocker = document.getElementById('kpi-docker');
+      const kHttp = document.getElementById('kpi-http');
+
+      if (mode === 'incident') {
+        card.classList.add('critical');
+        badge.className = 'badge badge-critical';
+        badge.textContent = '▲ CRITICAL (2 Alertes)';
+        dBox.classList.add('alert');
+        dTxt.style.color = 'var(--error)';
+        dTxt.textContent = '5 running / 1 EXITED (137)';
+        hBox.classList.add('alert');
+        hTxt.style.color = 'var(--error)';
+        hTxt.textContent = '2/3 OK • 1 KO (502)';
+        kDocker.style.color = 'var(--error)';
+        kDocker.textContent = '14 Run / 1 Down';
+        kHttp.style.color = 'var(--error)';
+        kHttp.textContent = '6 / 7 OK (1 KO)';
+      } else {
+        card.classList.remove('critical');
+        badge.className = 'badge badge-online';
+        badge.textContent = '● ONLINE';
+        dBox.classList.remove('alert');
+        dTxt.style.color = 'var(--success)';
+        dTxt.textContent = '6 running / 0 caiguts';
+        hBox.classList.remove('alert');
+        hTxt.style.color = 'var(--success)';
+        hTxt.textContent = '3/3 OK (200/202 • 24ms)';
+        kDocker.style.color = 'var(--success)';
+        kDocker.textContent = '15 Running';
+        kHttp.style.color = 'var(--success)';
+        kHttp.textContent = '7 / 7 OK';
+      }
+    }
+  </script>
+</body>
+</html>

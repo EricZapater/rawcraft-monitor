@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mockup: Detall de Servidor en Viu (Dockers, HTTP, Postgres) — Rawcraft Monitor</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;500;700&family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #1976d2;
+      --primary-light: #e3f2fd;
+      --text-primary: #1e293b;
+      --text-secondary: #64748b;
+      --bg-body: #f1f5f9;
+      --bg-card: #ffffff;
+      --border-color: #e2e8f0;
+      --sidebar-width: 240px;
+      --header-height: 64px;
+      --radius: 8px;
+      --success: #16a34a;
+      --warning: #d97706;
+      --error: #dc2626;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Roboto', sans-serif; }
+    body { background: var(--bg-body); color: var(--text-primary); min-height: 100vh; display: flex; }
+
+    .state-bar {
+      position: fixed;
+      top: 12px;
+      right: 20px;
+      z-index: 1000;
+      background: #1e293b;
+      border-radius: 30px;
+      padding: 4px 8px;
+      display: flex;
+      gap: 4px;
+    }
+    .state-btn {
+      background: transparent;
+      border: none;
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 500;
+      color: #94a3b8;
+      cursor: pointer;
+    }
+    .state-btn.active { background: var(--primary); color: #fff; }
+
+    .sidebar {
+      width: var(--sidebar-width);
+      background: #fff;
+      border-right: 1px solid var(--border-color);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+    }
+    .sidebar-brand {
+      height: var(--header-height);
+      display: flex;
+      align-items: center;
+      padding: 0 20px;
+      gap: 10px;
+      border-bottom: 1px solid var(--border-color);
+      font-weight: 700;
+    }
+    .brand-icon {
+      width: 30px;
+      height: 30px;
+      border-radius: 6px;
+      background: var(--primary);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Roboto Mono', monospace;
+    }
+    .nav-list { list-style: none; padding: 16px 12px; display: flex; flex-direction: column; gap: 4px; }
+    .nav-item a {
+      display: flex;
+      align-items: center;
+      padding: 10px 14px;
+      border-radius: var(--radius);
+      color: var(--text-secondary);
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 500;
+    }
+    .nav-item.active a { background: var(--primary-light); color: var(--primary); font-weight: 600; }
+
+    .main-wrapper { flex: 1; display: flex; flex-direction: column; }
+    .topbar {
+      height: var(--header-height);
+      background: #fff;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 32px;
+    }
+    .content-area { padding: 24px 32px; max-width: 1280px; width: 100%; }
+
+    .os-banner {
+      background: #fff;
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      padding: 16px 20px;
+      margin-bottom: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .badge-reboot {
+      background: #fef3c7;
+      color: #92400e;
+      border: 1px solid #fde68a;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 4px 10px;
+      border-radius: 6px;
+    }
+
+    .card {
+      background: #fff;
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      margin-bottom: 20px;
+      overflow: hidden;
+    }
+    .card-header {
+      padding: 14px 20px;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-weight: 700;
+      font-size: 15px;
+    }
+
+    .table { width: 100%; border-collapse: collapse; text-align: left; font-size: 13px; }
+    .table th {
+      background: #f8fafc;
+      padding: 11px 16px;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      border-bottom: 1px solid var(--border-color);
+    }
+    .table td { padding: 12px 16px; border-bottom: 1px solid var(--border-color); vertical-align: middle; }
+    .mono { font-family: 'Roboto Mono', monospace; font-size: 12px; }
+
+    .state-pill {
+      display: inline-block;
+      padding: 3px 8px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .pill-ok { background: #dcfce7; color: #166534; }
+    .pill-ko { background: #fee2e2; color: #991b1b; }
+
+    .bar-bg {
+      width: 110px;
+      height: 7px;
+      background: #e2e8f0;
+      border-radius: 4px;
+      overflow: hidden;
+      display: inline-block;
+      vertical-align: middle;
+      margin-right: 6px;
+    }
+    .bar-fill { height: 100%; background: var(--primary); }
+
+    .grid-2 { display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 20px; }
+  </style>
+</head>
+<body>
+
+  <div class="state-bar">
+    <button class="state-btn active" onclick="setDetail('ok', this)">1. Tots els Contenidors i Endpoints OK</button>
+    <button class="state-btn" onclick="setDetail('ko', this)">2. Contenidor Caigut (Exited 137) + Endpoint 502</button>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <div class="brand-icon">&gt;_</div>
+      <span>Rawcraft Monitor</span>
+    </div>
+    <ul class="nav-list">
+      <li class="nav-item active"><a href="#">Dashboard Servidors</a></li>
+      <li class="nav-item"><a href="#">Alertes</a></li>
+      <li class="nav-item"><a href="#">Inventari & YAML</a></li>
+      <li class="nav-item"><a href="#">Usuaris i Permisos</a></li>
+    </ul>
+  </aside>
+
+  <div class="main-wrapper">
+    <header class="topbar">
+      <div style="font-size: 14px; font-weight: 600;">← Tornar al Dashboard • Detall en viu: <code>srv-ovh-prod-01</code> (`HU-TEL-03`)</div>
+      <div style="font-size: 13px; color: var(--text-secondary);">System information as of Wed Nov 11 09:13:08 CET 2026</div>
+    </header>
+
+    <main class="content-area">
+      <!-- Fitxa SO + Reboot Required -->
+      <div class="os-banner">
+        <div>
+          <div style="font-size: 18px; font-weight: 700;">srv-ovh-prod-01 <span class="mono" style="color: var(--text-secondary);">(ens3: 91.134.91.36)</span></div>
+          <div style="font-size: 13px; color: var(--text-secondary); margin-top: 4px;">
+            <strong>SO:</strong> Ubuntu 24.04.1 LTS &nbsp;|&nbsp;
+            <strong>Kernel:</strong> 6.8.0-45-generic (amd64) &nbsp;|&nbsp;
+            <strong>Load:</strong> 0.15 / 0.22 / 0.19 &nbsp;|&nbsp;
+            <strong>Disc /:</strong> 56.4% of 38.60GB &nbsp;|&nbsp;
+            <strong>RAM:</strong> 47% &nbsp;|&nbsp;
+            <strong>Swap:</strong> 19% &nbsp;|&nbsp;
+            <strong>Procs:</strong> 174 &nbsp;|&nbsp;
+            <strong>Users:</strong> 0
+          </div>
+        </div>
+        <span class="badge-reboot">⚠ Reboot required (`/var/run/reboot-required`)</span>
+      </div>
+
+      <!-- TAULA DE CONTENIDORS DOCKER AMB CPU I RAM -->
+      <div class="card">
+        <div class="card-header">
+          <span>Contenidors Docker al Servidor (CPU i RAM per contenidor)</span>
+          <span class="mono" style="color: var(--success);">dockerd: UP</span>
+        </div>
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Contenidor</th>
+              <th>Imatge</th>
+              <th>Estat & Healthcheck</th>
+              <th>Uptime / Status</th>
+              <th>CPU (%)</th>
+              <th>Memòria RAM (MB / Límit / %)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong class="mono">traefik</strong></td>
+              <td class="mono">traefik:v3.1</td>
+              <td><span class="state-pill pill-ok">running (healthy)</span></td>
+              <td>Up 42 days</td>
+              <td class="mono">0.4%</td>
+              <td class="mono">
+                <div class="bar-bg"><div class="bar-fill" style="width: 14%;"></div></div>
+                36 MB / 256 MB (14.0%)
+              </td>
+            </tr>
+            <tr>
+              <td><strong class="mono">postgres-main</strong></td>
+              <td class="mono">postgres:16-alpine</td>
+              <td><span class="state-pill pill-ok">running (healthy)</span></td>
+              <td>Up 42 days</td>
+              <td class="mono">2.1%</td>
+              <td class="mono">
+                <div class="bar-bg"><div class="bar-fill" style="width: 38%;"></div></div>
+                389 MB / 1024 MB (38.0%)
+              </td>
+            </tr>
+            <tr id="docker-row-nasc">
+              <td><strong class="mono">nasc-backend</strong></td>
+              <td class="mono">ghcr.io/ericzapater/nasc-backend:latest</td>
+              <td><span id="docker-pill-nasc" class="state-pill pill-ok">running (healthy)</span></td>
+              <td id="docker-up-nasc">Up 12 days</td>
+              <td id="docker-cpu-nasc" class="mono">0.8%</td>
+              <td class="mono">
+                <div class="bar-bg"><div class="bar-fill" style="width: 9%;"></div></div>
+                24 MB / 256 MB (9.3%)
+              </td>
+            </tr>
+            <tr>
+              <td><strong class="mono">nasc-frontend</strong></td>
+              <td class="mono">ghcr.io/ericzapater/nasc-frontend:latest</td>
+              <td><span class="state-pill pill-ok">running</span></td>
+              <td>Up 12 days</td>
+              <td class="mono">0.1%</td>
+              <td class="mono">
+                <div class="bar-bg"><div class="bar-fill" style="width: 6%;"></div></div>
+                8 MB / 128 MB (6.2%)
+              </td>
+            </tr>
+            <tr>
+              <td><strong class="mono">rawcraft-monitor-backend</strong></td>
+              <td class="mono">ghcr.io/ericzapater/rawcraft-monitor-backend:latest</td>
+              <td><span class="state-pill pill-ok">running (healthy)</span></td>
+              <td>Up 5 days</td>
+              <td class="mono">0.6%</td>
+              <td class="mono">
+                <div class="bar-bg"><div class="bar-fill" style="width: 11%;"></div></div>
+                28 MB / 256 MB (10.9%)
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="grid-2">
+        <!-- TAULA D'ENDPOINTS HTTP (200 / 202) -->
+        <div class="card">
+          <div class="card-header">
+            <span>Endpoints HTTP d'Aplicacions (Esperant 200 / 202)</span>
+          </div>
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Aplicació</th>
+                <th>URL</th>
+                <th>Esperat</th>
+                <th>Rebut</th>
+                <th>Latència</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr id="http-row-nasc">
+                <td><strong>Nasc API</strong></td>
+                <td class="mono">http://127.0.0.1:8081/health</td>
+                <td class="mono">200, 202</td>
+                <td><span id="http-pill-nasc" class="state-pill pill-ok">200 OK</span></td>
+                <td id="http-ms-nasc" class="mono">12 ms</td>
+              </tr>
+              <tr>
+                <td><strong>Nasc Web</strong></td>
+                <td class="mono">https://nasc.ericzapater.cat</td>
+                <td class="mono">200, 202</td>
+                <td><span class="state-pill pill-ok">200 OK</span></td>
+                <td class="mono">28 ms</td>
+              </tr>
+              <tr>
+                <td><strong>Rawcraft API</strong></td>
+                <td class="mono">http://127.0.0.1:8080/health</td>
+                <td class="mono">200, 202</td>
+                <td><span class="state-pill pill-ok">200 OK</span></td>
+                <td class="mono">8 ms</td>
+              </tr>
+              <tr>
+                <td><strong>Webhook Worker</strong></td>
+                <td class="mono">http://127.0.0.1:9090/ready</td>
+                <td class="mono">200, 202</td>
+                <td><span class="state-pill pill-ok">202 Accepted</span></td>
+                <td class="mono">19 ms</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- POTETA POSTGRESQL DINS DOCKER -->
+        <div class="card">
+          <div class="card-header">
+            <span>Poteta PostgreSQL (`postgres-main`)</span>
+            <span class="state-pill pill-ok">SELECT 1: UP (3 ms)</span>
+          </div>
+          <div style="padding: 18px 20px; font-size: 13px; display: flex; flex-direction: column; gap: 14px;">
+            <div>
+              <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                <span><strong>Connexions Actives vs. `max_connections`</strong></span>
+                <span class="mono">14 / 100 (14.0%) • Llindar: 80%</span>
+              </div>
+              <div class="bar-bg" style="width: 100%; height: 9px;">
+                <div class="bar-fill" style="width: 14%;"></div>
+              </div>
+            </div>
+            <div style="display: flex; justify-content: space-between; border-top: 1px solid var(--border-color); padding-top: 10px;">
+              <span>Mida Total Bases de Dades (`pg_database_size`):</span>
+              <strong class="mono">1,420 MB (1.38 GB)</strong>
+            </div>
+            <div style="display: flex; justify-content: space-between; border-top: 1px solid var(--border-color); padding-top: 10px;">
+              <span>Consultes lentes (&gt; 60s):</span>
+              <strong class="mono" style="color: var(--success);">0</strong>
+            </div>
+            <div style="display: flex; justify-content: space-between; border-top: 1px solid var(--border-color); padding-top: 10px;">
+              <span>Locks en espera (`locks_waiting`):</span>
+              <strong class="mono" style="color: var(--success);">0</strong>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    function setDetail(state, btn) {
+      document.querySelectorAll('.state-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const dPill = document.getElementById('docker-pill-nasc');
+      const dUp = document.getElementById('docker-up-nasc');
+      const dCpu = document.getElementById('docker-cpu-nasc');
+      const hPill = document.getElementById('http-pill-nasc');
+      const hMs = document.getElementById('http-ms-nasc');
+
+      if (state === 'ko') {
+        dPill.className = 'state-pill pill-ko';
+        dPill.textContent = 'exited (137 - OOMKilled)';
+        dUp.textContent = 'Exited (137) 25 seconds ago';
+        dCpu.textContent = '0.0%';
+        hPill.className = 'state-pill pill-ko';
+        hPill.textContent = '502 Bad Gateway';
+        hMs.textContent = '5001 ms (Timeout)';
+      } else {
+        dPill.className = 'state-pill pill-ok';
+        dPill.textContent = 'running (healthy)';
+        dUp.textContent = 'Up 12 days';
+        dCpu.textContent = '0.8%';
+        hPill.className = 'state-pill pill-ok';
+        hPill.textContent = '200 OK';
+        hMs.textContent = '12 ms';
+      }
+    }
+  </script>
+</body>
+</html>

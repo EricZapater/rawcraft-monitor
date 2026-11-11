@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mockup: Gestió d'Usuaris i Permisos per Servidor — Rawcraft Monitor</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;500&family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #1976d2;
+      --primary-dark: #115293;
+      --primary-light: #e3f2fd;
+      --text-primary: #1e293b;
+      --text-secondary: #64748b;
+      --bg-body: #f1f5f9;
+      --bg-card: #ffffff;
+      --border-color: #e2e8f0;
+      --sidebar-width: 240px;
+      --header-height: 64px;
+      --radius: 8px;
+      --success: #2e7d32;
+      --success-bg: #edf7ed;
+      --error: #d32f2f;
+      --error-bg: #fde8e8;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Roboto', -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-body);
+      color: var(--text-primary);
+      min-height: 100vh;
+      display: flex;
+    }
+
+    .state-bar {
+      position: fixed;
+      top: 12px;
+      right: 20px;
+      z-index: 1000;
+      background: #1e293b;
+      border-radius: 30px;
+      padding: 4px 8px;
+      display: flex;
+      gap: 4px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.18);
+    }
+
+    .state-btn {
+      background: transparent;
+      border: none;
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 500;
+      color: #94a3b8;
+      cursor: pointer;
+    }
+
+    .state-btn.active {
+      background: var(--primary);
+      color: #ffffff;
+    }
+
+    .sidebar {
+      width: var(--sidebar-width);
+      background: #ffffff;
+      border-right: 1px solid var(--border-color);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+    }
+
+    .sidebar-brand {
+      height: var(--header-height);
+      display: flex;
+      align-items: center;
+      padding: 0 20px;
+      gap: 10px;
+      border-bottom: 1px solid var(--border-color);
+      font-weight: 700;
+      font-size: 16px;
+    }
+
+    .brand-icon {
+      width: 30px;
+      height: 30px;
+      border-radius: 6px;
+      background: var(--primary);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Roboto Mono', monospace;
+      font-size: 14px;
+    }
+
+    .nav-list {
+      list-style: none;
+      padding: 16px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .nav-item a {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 14px;
+      border-radius: var(--radius);
+      color: var(--text-secondary);
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    .nav-item.active a {
+      background: var(--primary-light);
+      color: var(--primary);
+      font-weight: 600;
+    }
+
+    .main-wrapper {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+
+    .topbar {
+      height: var(--header-height);
+      background: #ffffff;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 32px;
+    }
+
+    .content-area {
+      padding: 32px;
+      max-width: 1200px;
+      width: 100%;
+    }
+
+    .page-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+    }
+
+    .page-title {
+      font-size: 22px;
+      font-weight: 700;
+    }
+
+    .page-subtitle {
+      font-size: 14px;
+      color: var(--text-secondary);
+      margin-top: 4px;
+    }
+
+    .btn-primary {
+      background: var(--primary);
+      color: #ffffff;
+      border: none;
+      padding: 10px 18px;
+      border-radius: var(--radius);
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+    }
+
+    .btn-secondary {
+      background: #ffffff;
+      color: var(--text-primary);
+      border: 1px solid var(--border-color);
+      padding: 8px 14px;
+      border-radius: var(--radius);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+    }
+
+    .btn-danger {
+      background: var(--error);
+      color: #ffffff;
+      border: none;
+      padding: 10px 16px;
+      border-radius: var(--radius);
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+    }
+
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+
+    .table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+    }
+
+    .table th {
+      background: #f8fafc;
+      padding: 14px 20px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .table td {
+      padding: 16px 20px;
+      font-size: 14px;
+      border-bottom: 1px solid var(--border-color);
+      vertical-align: middle;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    .badge-admin { background: #e0e7ff; color: #3730a3; }
+    .badge-user { background: #f1f5f9; color: #334155; }
+    .badge-active { background: #dcfce7; color: #166534; }
+    .badge-inactive { background: #fee2e2; color: #991b1b; }
+    .server-chip {
+      display: inline-block;
+      background: var(--primary-light);
+      color: var(--primary-dark);
+      border: 1px solid #bbdefb;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-family: 'Roboto Mono', monospace;
+      margin-right: 4px;
+    }
+
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.5);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 500;
+    }
+
+    .modal-content {
+      background: #ffffff;
+      border-radius: 12px;
+      width: 100%;
+      max-width: 520px;
+      border: 1px solid var(--border-color);
+      overflow: hidden;
+    }
+
+    .modal-header {
+      padding: 18px 24px;
+      border-bottom: 1px solid var(--border-color);
+      font-size: 17px;
+      font-weight: 700;
+    }
+
+    .modal-body {
+      padding: 24px;
+    }
+
+    .modal-footer {
+      padding: 14px 24px;
+      background: #f8fafc;
+      border-top: 1px solid var(--border-color);
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+    }
+
+    .form-group { margin-bottom: 16px; }
+    .form-label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 6px; }
+    .form-input, .form-select {
+      width: 100%;
+      padding: 9px 12px;
+      font-size: 14px;
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius);
+    }
+
+    .server-checkbox-list {
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius);
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      background: #f8fafc;
+    }
+
+    .checkbox-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 13px;
+    }
+
+    .alert-error {
+      background: var(--error-bg);
+      color: var(--error);
+      border-left: 4px solid var(--error);
+      padding: 10px 14px;
+      border-radius: 4px;
+      font-size: 13px;
+      margin-bottom: 14px;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="state-bar">
+    <button class="state-btn active" onclick="showState('list', this)">1. Llistat d'Usuaris</button>
+    <button class="state-btn" onclick="showState('modal', this)">2. Modal Alta / Assignar Servidors</button>
+    <button class="state-btn" onclick="showState('conflict', this)">3. Error 409 (Email duplicat)</button>
+    <button class="state-btn" onclick="showState('delete', this)">4. Confirmació Baixa Sensible</button>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <div class="brand-icon">&gt;_</div>
+      <span>Rawcraft Monitor</span>
+    </div>
+    <ul class="nav-list">
+      <li class="nav-item"><a href="#">Dashboard Servidors</a></li>
+      <li class="nav-item"><a href="#">Alertes <span>2</span></a></li>
+      <li class="nav-item"><a href="#">Inventari & YAML</a></li>
+      <li class="nav-item active"><a href="#">Usuaris i Permisos</a></li>
+    </ul>
+  </aside>
+
+  <div class="main-wrapper">
+    <header class="topbar">
+      <div style="font-size: 13px; color: var(--text-secondary);">Administració d'accés multiusuari per servidor</div>
+      <div style="font-size: 14px; font-weight: 600;">Eric Zapater (ADMIN)</div>
+    </header>
+
+    <main class="content-area">
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">Usuaris i Permisos per Servidor</h1>
+          <p class="page-subtitle">Gestiona quins usuaris tenen accés al Punt Central i quins servidors pot consultar cada operador (`HU-USR-02`, `HU-USR-03`).</p>
+        </div>
+        <button class="btn-primary" onclick="showState('modal', document.querySelectorAll('.state-btn')[1])">+ Nou Usuari</button>
+      </div>
+
+      <div class="card">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Usuari</th>
+              <th>Rol</th>
+              <th>Servidors Autoritzats</th>
+              <th>Estat</th>
+              <th>Data d'alta</th>
+              <th>Accions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>
+                <div style="font-weight: 600;">Eric Zapater</div>
+                <div style="font-size: 12px; color: var(--text-secondary);">eric@rawcraft.cat</div>
+              </td>
+              <td><span class="badge badge-admin">ADMIN</span></td>
+              <td><span style="font-size: 13px; color: var(--text-secondary);">Tots els servidors (Accés global)</span></td>
+              <td><span class="badge badge-active">Actiu</span></td>
+              <td>11/11/2026</td>
+              <td><button class="btn-secondary">Editar</button></td>
+            </tr>
+            <tr>
+              <td>
+                <div style="font-weight: 600;">Marc Rovira</div>
+                <div style="font-size: 12px; color: var(--text-secondary);">marc@rawcraft.cat</div>
+              </td>
+              <td><span class="badge badge-user">USER</span></td>
+              <td>
+                <span class="server-chip">srv-ovh-prod-01</span>
+                <span class="server-chip">srv-hetzner-02</span>
+              </td>
+              <td><span class="badge badge-active">Actiu</span></td>
+              <td>11/11/2026</td>
+              <td>
+                <button class="btn-secondary">Editar / Servidors</button>
+                <button class="btn-secondary" style="color: var(--error);">Baixa</button>
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <div style="font-weight: 600;">Anna Puig</div>
+                <div style="font-size: 12px; color: var(--text-secondary);">anna@rawcraft.cat</div>
+              </td>
+              <td><span class="badge badge-user">USER</span></td>
+              <td>
+                <span class="server-chip">srv-hetzner-02</span>
+              </td>
+              <td><span class="badge badge-inactive">Inactiu</span></td>
+              <td>11/11/2026</td>
+              <td>
+                <button class="btn-secondary">Editar / Servidors</button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </main>
+  </div>
+
+  <!-- Modal Alta / Edició i Permisos per Servidor -->
+  <div id="modal-user" class="modal-backdrop">
+    <div class="modal-content">
+      <div class="modal-header">Configurar Usuari i Accés a Servidors</div>
+      <div class="modal-body">
+        <div id="conflict-banner" class="alert-error">
+          <strong>Error 409 Conflict:</strong> Ja existeix un usuari registrat amb aquest correu electrònic.
+        </div>
+        <div class="form-group">
+          <label class="form-label">Nom complet</label>
+          <input type="text" class="form-input" value="Marc Rovira">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Correu electrònic (també usable per a alertes SMTP)</label>
+          <input type="email" class="form-input" value="marc@rawcraft.cat">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Contrasenya inicial (mínim 8 caràcters)</label>
+          <input type="password" class="form-input" value="••••••••••••">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Rol del sistema</label>
+          <select class="form-select">
+            <option value="USER" selected>USER — Només veu els servidors assignats</option>
+            <option value="ADMIN">ADMIN — Accés complet a tots els servidors i configuració YAML</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Servidors autoritzats per a aquest usuari (`server_ids`)</label>
+          <div class="server-checkbox-list">
+            <label class="checkbox-row">
+              <input type="checkbox" checked>
+              <strong>srv-ovh-prod-01</strong> <span style="color: var(--text-secondary);">(91.134.91.36 — Punt Central + Apps)</span>
+            </label>
+            <label class="checkbox-row">
+              <input type="checkbox" checked>
+              <strong>srv-hetzner-02</strong> <span style="color: var(--text-secondary);">(116.203.44.19 — Serveis Docker + Postgres)</span>
+            </label>
+            <label class="checkbox-row">
+              <input type="checkbox">
+              <strong>srv-staging-03</strong> <span style="color: var(--text-secondary);">(142.132.10.88 — Preproducció)</span>
+            </label>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary">Cancel·lar</button>
+        <button class="btn-primary">Desar usuari i permisos</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Confirmació Baixa d'Entitat Sensible -->
+  <div id="modal-delete" class="modal-backdrop">
+    <div class="modal-content" style="max-width: 440px;">
+      <div class="modal-header" style="color: var(--error);">Confirmar baixa d'usuari (Entitat Sensible)</div>
+      <div class="modal-body">
+        <p style="font-size: 14px; line-height: 1.5; margin-bottom: 12px;">
+          Estàs a punt de donar de baixa l'usuari <strong>marc@rawcraft.cat</strong>. S'aplicarà <em>soft-delete</em> (`confirm=true`) i es revocarà immediatament el seu accés als servidors assignats.
+        </p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary">Cancel·lar</button>
+        <button class="btn-danger">Confirmar baixa (`confirm=true`)</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function showState(state, btn) {
+      document.querySelectorAll('.state-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const modalUser = document.getElementById('modal-user');
+      const modalDelete = document.getElementById('modal-delete');
+      const conflict = document.getElementById('conflict-banner');
+
+      modalUser.style.display = 'none';
+      modalDelete.style.display = 'none';
+      conflict.style.display = 'none';
+
+      if (state === 'modal') {
+        modalUser.style.display = 'flex';
+      } else if (state === 'conflict') {
+        modalUser.style.display = 'flex';
+        conflict.style.display = 'block';
+      } else if (state === 'delete') {
+        modalDelete.style.display = 'flex';
+      }
+    }
+  </script>
+</body>
+</html>

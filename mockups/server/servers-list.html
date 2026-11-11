@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mockup: Inventari de Servidors i API Keys — Rawcraft Monitor</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;500&family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #1976d2;
+      --primary-dark: #115293;
+      --primary-light: #e3f2fd;
+      --text-primary: #1e293b;
+      --text-secondary: #64748b;
+      --bg-body: #f1f5f9;
+      --bg-card: #ffffff;
+      --border-color: #e2e8f0;
+      --sidebar-width: 240px;
+      --header-height: 64px;
+      --radius: 8px;
+      --success: #2e7d32;
+      --error: #d32f2f;
+      --warning: #ed6c02;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Roboto', sans-serif; }
+    body { background: var(--bg-body); color: var(--text-primary); min-height: 100vh; display: flex; }
+
+    .state-bar {
+      position: fixed;
+      top: 12px;
+      right: 20px;
+      z-index: 1000;
+      background: #1e293b;
+      border-radius: 30px;
+      padding: 4px 8px;
+      display: flex;
+      gap: 4px;
+    }
+    .state-btn {
+      background: transparent;
+      border: none;
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 500;
+      color: #94a3b8;
+      cursor: pointer;
+    }
+    .state-btn.active { background: var(--primary); color: #fff; }
+
+    .sidebar {
+      width: var(--sidebar-width);
+      background: #fff;
+      border-right: 1px solid var(--border-color);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+    }
+    .sidebar-brand {
+      height: var(--header-height);
+      display: flex;
+      align-items: center;
+      padding: 0 20px;
+      gap: 10px;
+      border-bottom: 1px solid var(--border-color);
+      font-weight: 700;
+    }
+    .brand-icon {
+      width: 30px;
+      height: 30px;
+      border-radius: 6px;
+      background: var(--primary);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Roboto Mono', monospace;
+    }
+    .nav-list { list-style: none; padding: 16px 12px; display: flex; flex-direction: column; gap: 4px; }
+    .nav-item a {
+      display: flex;
+      align-items: center;
+      padding: 10px 14px;
+      border-radius: var(--radius);
+      color: var(--text-secondary);
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 500;
+    }
+    .nav-item.active a { background: var(--primary-light); color: var(--primary); font-weight: 600; }
+
+    .main-wrapper { flex: 1; display: flex; flex-direction: column; }
+    .topbar {
+      height: var(--header-height);
+      background: #fff;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 32px;
+    }
+    .content-area { padding: 32px; max-width: 1240px; width: 100%; }
+    .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+    .page-title { font-size: 22px; font-weight: 700; }
+    .page-subtitle { font-size: 14px; color: var(--text-secondary); margin-top: 4px; }
+
+    .btn-primary {
+      background: var(--primary);
+      color: #fff;
+      border: none;
+      padding: 10px 18px;
+      border-radius: var(--radius);
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+    }
+    .btn-secondary {
+      background: #fff;
+      border: 1px solid var(--border-color);
+      padding: 7px 12px;
+      border-radius: var(--radius);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+    }
+    .btn-danger {
+      background: var(--error);
+      color: #fff;
+      border: none;
+      padding: 9px 16px;
+      border-radius: var(--radius);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+    }
+
+    .card { background: #fff; border: 1px solid var(--border-color); border-radius: 10px; overflow: hidden; }
+    .table { width: 100%; border-collapse: collapse; text-align: left; }
+    .table th {
+      background: #f8fafc;
+      padding: 14px 18px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      border-bottom: 1px solid var(--border-color);
+    }
+    .table td { padding: 16px 18px; font-size: 14px; border-bottom: 1px solid var(--border-color); vertical-align: middle; }
+
+    .mono { font-family: 'Roboto Mono', monospace; font-size: 12px; color: var(--text-secondary); }
+    .feature-pill {
+      display: inline-block;
+      background: #f1f5f9;
+      border: 1px solid var(--border-color);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 500;
+      margin-right: 4px;
+    }
+
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.5);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 500;
+    }
+    .modal-content {
+      background: #fff;
+      border-radius: 12px;
+      width: 100%;
+      max-width: 500px;
+      border: 1px solid var(--border-color);
+      overflow: hidden;
+    }
+    .modal-header { padding: 18px 24px; border-bottom: 1px solid var(--border-color); font-size: 17px; font-weight: 700; }
+    .modal-body { padding: 24px; }
+    .modal-footer {
+      padding: 14px 24px;
+      background: #f8fafc;
+      border-top: 1px solid var(--border-color);
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+    }
+    .form-group { margin-bottom: 14px; }
+    .form-label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 6px; }
+    .form-input { width: 100%; padding: 9px 12px; font-size: 14px; border: 1px solid var(--border-color); border-radius: var(--radius); }
+    .code-box {
+      background: #0f172a;
+      color: #38bdf8;
+      padding: 12px;
+      border-radius: 6px;
+      font-family: 'Roboto Mono', monospace;
+      font-size: 12px;
+      word-break: break-all;
+      margin-top: 8px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="state-bar">
+    <button class="state-btn active" onclick="showState('list', this)">1. Inventari de Servidors</button>
+    <button class="state-btn" onclick="showState('create', this)">2. Modal Nou Servidor</button>
+    <button class="state-btn" onclick="showState('apikey', this)">3. Rotació d'API Key</button>
+    <button class="state-btn" onclick="showState('delete', this)">4. Confirmació Baixa Servidor</button>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <div class="brand-icon">&gt;_</div>
+      <span>Rawcraft Monitor</span>
+    </div>
+    <ul class="nav-list">
+      <li class="nav-item"><a href="#">Dashboard Servidors</a></li>
+      <li class="nav-item"><a href="#">Alertes</a></li>
+      <li class="nav-item active"><a href="#">Inventari & YAML</a></li>
+      <li class="nav-item"><a href="#">Usuaris i Permisos</a></li>
+    </ul>
+  </aside>
+
+  <div class="main-wrapper">
+    <header class="topbar">
+      <div style="font-size: 13px; color: var(--text-secondary);">Gestió d'inventari de servidors i generació de `config.yaml` (`HU-SRV-01`)</div>
+      <div style="font-size: 14px; font-weight: 600;">Eric Zapater (ADMIN)</div>
+    </header>
+
+    <main class="content-area">
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">Inventari de Servidors Monitoritzats</h1>
+          <p class="page-subtitle">Dona d'alta servidors, configura les 4 potetes de cada màquina i descarrega el seu `config.yaml` amb identificador únic.</p>
+        </div>
+        <button class="btn-primary">+ Registrar Nou Servidor</button>
+      </div>
+
+      <div class="card">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Servidor & UUID</th>
+              <th>Sistema Operatiu / IP</th>
+              <th>Intervals (Watchdog / Històric)</th>
+              <th>Potetes Actives</th>
+              <th>Accions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>
+                <div style="font-weight: 600;">srv-ovh-prod-01 (Punt Central + Apps)</div>
+                <div class="mono">id: 9b2f4e10-8a1c-4d32-91e4-001122334455</div>
+              </td>
+              <td>
+                <div>Ubuntu 24.04.1 LTS</div>
+                <div class="mono">ens3: 91.134.91.36</div>
+              </td>
+              <td>
+                <span class="mono">Check: 15s | Report: 300s (5m)</span>
+              </td>
+              <td>
+                <span class="feature-pill">Host/SO</span>
+                <span class="feature-pill">Docker (9)</span>
+                <span class="feature-pill">HTTP (4)</span>
+                <span class="feature-pill">Postgres (1)</span>
+              </td>
+              <td>
+                <button class="btn-secondary">Configurar 4 Potetes & YAML</button>
+                <button class="btn-secondary">Rotar API Key</button>
+                <button class="btn-secondary" style="color: var(--error);">Baixa</button>
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <div style="font-weight: 600;">srv-hetzner-02 (Worker & Serveis)</div>
+                <div class="mono">id: 3c8a1122-4f90-4b71-a012-998877665544</div>
+              </td>
+              <td>
+                <div>Debian GNU/Linux 12 (bookworm)</div>
+                <div class="mono">eth0: 116.203.44.19</div>
+              </td>
+              <td>
+                <span class="mono">Check: 15s | Report: 300s (5m)</span>
+              </td>
+              <td>
+                <span class="feature-pill">Host/SO</span>
+                <span class="feature-pill">Docker (6)</span>
+                <span class="feature-pill">HTTP (3)</span>
+                <span class="feature-pill">Postgres (1)</span>
+              </td>
+              <td>
+                <button class="btn-secondary">Configurar 4 Potetes & YAML</button>
+                <button class="btn-secondary">Rotar API Key</button>
+                <button class="btn-secondary" style="color: var(--error);">Baixa</button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </main>
+  </div>
+
+  <!-- Modal Nou Servidor -->
+  <div id="modal-create" class="modal-backdrop">
+    <div class="modal-content">
+      <div class="modal-header">Registrar Nou Servidor</div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">Nom identificador del servidor (`name`)</label>
+          <input type="text" class="form-input" value="srv-eu-west-03">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Descripció / Rol de la màquina</label>
+          <input type="text" class="form-input" value="Tercer servidor d'aplicacions i rèplica">
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          <div class="form-group">
+            <label class="form-label">Bucle ràpid (`check_interval_seconds`)</label>
+            <input type="number" class="form-input" value="15">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Bucle històric (`report_interval_seconds`)</label>
+            <input type="number" class="form-input" value="300">
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary">Cancel·lar</button>
+        <button class="btn-primary">Crear i passar a Configurar YAML</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Rotar API Key -->
+  <div id="modal-apikey" class="modal-backdrop">
+    <div class="modal-content">
+      <div class="modal-header">Nova API Key Generada (`srv-ovh-prod-01`)</div>
+      <div class="modal-body">
+        <p style="font-size: 13px; color: var(--text-secondary);">
+          L'anterior `api_key` ha quedat invalidada. Descarrega de nou el `config.yaml` o actualitza el camp `api_key` a `/etc/rawcraft-agent/config.yaml`:
+        </p>
+        <div class="code-box">rcm_live_9b2f4e10_f83a91c044e8b72d1950a3c6e712</div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-primary">Entès, descarregar nou `config.yaml`</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Confirmació Baixa Servidor -->
+  <div id="modal-delete" class="modal-backdrop">
+    <div class="modal-content" style="max-width: 440px;">
+      <div class="modal-header" style="color: var(--error);">Confirmar baixa del servidor (Entitat Sensible)</div>
+      <div class="modal-body">
+        <p style="font-size: 14px; line-height: 1.5;">
+          Vols donar de baixa el servidor <strong>srv-hetzner-02</strong>? S'aplicarà <em>soft-delete</em> (`confirm=true`), es desactivarà el seu *Heartbeat* i es conservarà l'històric fins que venci la política de retenció.
+        </p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary">Cancel·lar</button>
+        <button class="btn-danger">Confirmar baixa (`confirm=true`)</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function showState(state, btn) {
+      document.querySelectorAll('.state-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('modal-create').style.display = state === 'create' ? 'flex' : 'none';
+      document.getElementById('modal-apikey').style.display = state === 'apikey' ? 'flex' : 'none';
+      document.getElementById('modal-delete').style.display = state === 'delete' ? 'flex' : 'none';
+    }
+  </script>
+</body>
+</html>
