@@ -365,11 +365,11 @@ export const DashboardView: React.FC = () => {
                   </Box>
                 </Box>
 
-                {/* Semàfor de les altres 3 potetes */}
+                {/* Semàfor de les 4 potetes i mètriques clau */}
                 <Box
                   sx={{
                     display: 'grid',
-                    gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, 1fr)' },
+                    gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', lg: 'repeat(4, 1fr)' },
                     gap: 1.25,
                     px: '22px',
                     pb: '18px',
@@ -384,11 +384,30 @@ export const DashboardView: React.FC = () => {
                     }}
                   >
                     <Typography sx={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: '#64748b', mb: 0.5 }}>
-                      Dockers
+                      Dockers Monitoritzats
                     </Typography>
                     <Typography sx={{ fontSize: 13, fontWeight: 600, color: dockerHasDown ? '#dc2626' : '#16a34a' }}>
-                      {srv.docker_running_count} running / {srv.docker_stopped_count}{' '}
-                      {dockerHasDown ? 'EXITED' : 'caiguts'}
+                      {srv.docker_running_count}/{srv.docker_monitored_count || (srv.docker_running_count + srv.docker_stopped_count)} actius
+                      {dockerHasDown ? ` (${srv.docker_stopped_count} caigut)` : ''}
+                    </Typography>
+                  </Box>
+
+                  <Box
+                    sx={{
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '8px',
+                      p: '10px 12px',
+                      bgcolor: '#f8fafc',
+                    }}
+                  >
+                    <Typography sx={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: '#64748b', mb: 0.5 }}>
+                      Total Contenidors Host
+                    </Typography>
+                    <Typography sx={{ fontSize: 13, fontWeight: 600, color: '#1e293b' }}>
+                      {srv.docker_total_host_containers ?? (srv.docker_running_count + srv.docker_stopped_count)} al host{' '}
+                      <span style={{ fontSize: 11.5, fontWeight: 500, color: '#64748b' }}>
+                        ({srv.docker_host_running_count ?? srv.docker_running_count} actius, {srv.docker_host_stopped_count ?? srv.docker_stopped_count} aturats)
+                      </span>
                     </Typography>
                   </Box>
 

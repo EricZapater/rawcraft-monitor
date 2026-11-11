@@ -167,6 +167,9 @@ export interface components {
         };
         DockerMetricsSnapshot: {
             docker_daemon_up: boolean;
+            total_host_containers?: number;
+            running_host_containers?: number;
+            stopped_host_containers?: number;
             containers: components["schemas"]["DockerContainerSnapshot"][];
         };
         HttpEndpointSnapshot: {
@@ -218,6 +221,10 @@ export interface components {
             host?: components["schemas"]["HostMetricsSnapshot"];
             docker_running_count: number;
             docker_stopped_count: number;
+            docker_monitored_count?: number;
+            docker_total_host_containers?: number;
+            docker_host_running_count?: number;
+            docker_host_stopped_count?: number;
             http_ok_count: number;
             http_total_count: number;
             http_avg_latency_ms?: number;

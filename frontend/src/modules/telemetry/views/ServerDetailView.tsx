@@ -194,11 +194,18 @@ export const ServerDetailView: React.FC = () => {
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: 1,
           }}
         >
-          <Typography sx={{ fontWeight: 700, fontSize: 15, color: '#1e293b' }}>
-            Contenidors Docker al Servidor (CPU i RAM per contenidor)
-          </Typography>
+          <Box>
+            <Typography sx={{ fontWeight: 700, fontSize: 15, color: '#1e293b' }}>
+              Contenidors Docker Monitoritzats (Llista Blanca)
+            </Typography>
+            <Typography sx={{ fontSize: 12, color: '#64748b', mt: 0.25 }}>
+              {sortedContainers.length} monitoritzats • Total al host: {liveDetail?.docker?.total_host_containers ?? sortedContainers.length} ({liveDetail?.docker?.running_host_containers ?? sortedContainers.length} actius, {liveDetail?.docker?.stopped_host_containers ?? 0} aturats)
+            </Typography>
+          </Box>
           <Typography
             sx={{
               fontFamily: '"Roboto Mono", monospace',

@@ -52,8 +52,11 @@ type DockerContainerSnapshot struct {
 }
 
 type DockerMetricsSnapshot struct {
-	DockerDaemonUp bool                      `json:"docker_daemon_up"`
-	Containers     []DockerContainerSnapshot `json:"containers"`
+	DockerDaemonUp        bool                      `json:"docker_daemon_up"`
+	TotalHostContainers   int                       `json:"total_host_containers"`
+	RunningHostContainers int                       `json:"running_host_containers"`
+	StoppedHostContainers int                       `json:"stopped_host_containers"`
+	Containers            []DockerContainerSnapshot `json:"containers"`
 }
 
 type HttpEndpointSnapshot struct {
@@ -109,10 +112,14 @@ type ServerDashboardSummary struct {
 	ReportIntervalSeconds  int                  `json:"report_interval_seconds"`
 	ActiveAlertsCount      int                  `json:"active_alerts_count"`
 	RebootRequired         bool                 `json:"reboot_required"`
-	Host                   *HostMetricsSnapshot `json:"host,omitempty"`
-	DockerRunningCount     int                  `json:"docker_running_count"`
-	DockerStoppedCount     int                  `json:"docker_stopped_count"`
-	HttpOkCount            int                  `json:"http_ok_count"`
+	Host                      *HostMetricsSnapshot `json:"host,omitempty"`
+	DockerRunningCount        int                  `json:"docker_running_count"`
+	DockerStoppedCount        int                  `json:"docker_stopped_count"`
+	DockerMonitoredCount      int                  `json:"docker_monitored_count"`
+	DockerTotalHostContainers int                  `json:"docker_total_host_containers"`
+	DockerHostRunningCount    int                  `json:"docker_host_running_count"`
+	DockerHostStoppedCount    int                  `json:"docker_host_stopped_count"`
+	HttpOkCount               int                  `json:"http_ok_count"`
 	HttpTotalCount         int                  `json:"http_total_count"`
 	HttpAvgLatencyMs       int                  `json:"http_avg_latency_ms"`
 	PostgresUpCount        int                  `json:"postgres_up_count"`

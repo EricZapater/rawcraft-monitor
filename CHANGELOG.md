@@ -5,6 +5,17 @@ Tots els canvis rellevants d'aquest projecte es documenten en aquest fitxer.
 El format es basa en [Keep a Changelog](https://keepachangelog.com/ca/1.0.0/),
 i aquest projecte segueix [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.5] - 2026-11-11
+
+### Added
+- **Monitorització de Docker per llista blanca (`required_containers`) i targeta de resum global del host**:
+  - L'agent ([`collector_docker.go`](backend/internal/agent/collector_docker.go)) recull exclusivament els contenidors definits a `required_containers` com a monitoritzats (estalviant recursos de CPU/RAM). Si un d'aquests contenidors no existeix a Docker, es marca com a `missing` (unhealthy).
+  - Comptadors globals de contenidors del host a [`telemetry/model.go`](backend/internal/telemetry/model.go): `total_host_containers`, `running_host_containers`, `stopped_host_containers`.
+  - Afegit un segon quadradet específic al panell de cada servidor a [`DashboardView.tsx`](frontend/src/modules/telemetry/views/DashboardView.tsx):
+    1. **Dockers Monitoritzats**: `X/Y actius` (verd si tots funcionen, vermell només si cau un dels monitoritzats).
+    2. **Total Contenidors Host**: mostra el total de contenidors reals al host (ex: `31 al host (18 actius, 13 aturats)`) com a informació neutra.
+  - Afegida traça al log de l'agent quan envia amb èxit el report de telemetria al Punt Central ([`runner.go`](backend/internal/agent/runner.go)).
+
 ## [0.1.4] - 2026-11-11
 
 ### Fixed

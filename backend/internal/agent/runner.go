@@ -111,6 +111,7 @@ func (r *Runner) runWatchdogAndMaybeReport(ctx context.Context, sendSnapshot boo
 			r.handleHubFailure(err)
 		} else {
 			r.handleHubRecovery()
+			log.Printf("[agent] Fotografia de telemetria enviada correctament al Punt Central (snapshot)")
 		}
 	}
 

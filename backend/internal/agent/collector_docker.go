@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net"
 	"net/http"
 	"strings"
@@ -99,39 +100,100 @@ func CollectDockerMetrics(ctx context.Context, cfg server.DockerPillarConfig) *t
 		return &telemetry.DockerMetricsSnapshot{DockerDaemonUp: true, Containers: []telemetry.DockerContainerSnapshot{}}
 	}
 
-	ignored := make(map[string]bool, len(cfg.IgnoreContainers))
-	for _, ig := range cfg.IgnoreContainers {
-		ignored[strings.TrimPrefix(strings.TrimSpace(ig), "/")] = true
-	}
-
-	snapshots := make([]telemetry.DockerContainerSnapshot, 0, len(rawContainers))
+	totalHost := len(rawContainers)
+	runningHost := 0
+	stoppedHost := 0
+	rawByName := make(map[string]dockerContainerListItem, len(rawContainers))
 	for _, rc := range rawContainers {
 		name := rc.ID
 		if len(rc.Names) > 0 {
 			name = strings.TrimPrefix(rc.Names[0], "/")
 		}
-		if ignored[name] {
-			continue
+		rawByName[name] = rc
+		if normalizeDockerState(rc.State) == "running" {
+			runningHost++
+		} else {
+			stoppedHost++
 		}
-
-		shortID := rc.ID
-		if len(shortID) > 12 {
-			shortID = shortID[:12]
-		}
-
-		health := parseDockerHealthFromStatus(rc.Status)
-		state := normalizeDockerState(rc.State)
-
-		snapshots = append(snapshots, telemetry.DockerContainerSnapshot{
-			ContainerID: shortID,
-			Name:        name,
-			Image:       rc.Image,
-			State:       state,
-			Status:      rc.Status,
-			Health:      health,
-			ExitCode:    0,
-		})
 	}
+
+	ignored := make(map[string]bool, len(cfg.IgnoreContainers))
+	for _, ig := range cfg.IgnoreContainers {
+		ignored[strings.TrimPrefix(strings.TrimSpace(ig), "/")] = true
+	}
+
+	snapshots := make([]telemetry.DockerContainerSnapshot, 0)
+
+	if len(cfg.RequiredContainers) > 0 {
+		// LLISTA BLANCA: només monitoritzem els contenidors de required_containers
+		for _, reqName := range cfg.RequiredContainers {
+			cleanReq := strings.TrimPrefix(strings.TrimSpace(reqName), "/")
+			if cleanReq == "" || ignored[cleanReq] {
+				continue
+			}
+
+			if rc, exists := rawByName[cleanReq]; exists {
+				shortID := rc.ID
+				if len(shortID) > 12 {
+					shortID = shortID[:12]
+				}
+				health := parseDockerHealthFromStatus(rc.Status)
+				state := normalizeDockerState(rc.State)
+
+				snapshots = append(snapshots, telemetry.DockerContainerSnapshot{
+					ContainerID: shortID,
+					Name:        cleanReq,
+					Image:       rc.Image,
+					State:       state,
+					Status:      rc.Status,
+					Health:      health,
+					ExitCode:    0,
+				})
+			} else {
+				snapshots = append(snapshots, telemetry.DockerContainerSnapshot{
+					ContainerID: "missing",
+					Name:        cleanReq,
+					Image:       "-",
+					State:       "missing",
+					Status:      "not found (required)",
+					Health:      "unhealthy",
+					ExitCode:    1,
+				})
+			}
+		}
+	} else {
+		// Si no hi ha llista blanca, recollim tots els contenidors no ignorats
+		for _, rc := range rawContainers {
+			name := rc.ID
+			if len(rc.Names) > 0 {
+				name = strings.TrimPrefix(rc.Names[0], "/")
+			}
+			if ignored[name] {
+				continue
+			}
+
+			shortID := rc.ID
+			if len(shortID) > 12 {
+				shortID = shortID[:12]
+			}
+
+			health := parseDockerHealthFromStatus(rc.Status)
+			state := normalizeDockerState(rc.State)
+
+			snapshots = append(snapshots, telemetry.DockerContainerSnapshot{
+				ContainerID: shortID,
+				Name:        name,
+				Image:       rc.Image,
+				State:       state,
+				Status:      rc.Status,
+				Health:      health,
+				ExitCode:    0,
+			})
+		}
+	}
+
+	log.Printf("[agent] [docker] Total host: %d (%d running, %d aturats) | Monitoritzats a la llista blanca: %d",
+		totalHost, runningHost, stoppedHost, len(snapshots))
 
 	// 3. Recollir CPU/RAM per als contenidors `running` amb un worker pool de màxim 3 goroutines (GOMEMLIMIT=20MiB)
 	if cfg.CollectContainerStats && len(snapshots) > 0 {
@@ -150,7 +212,7 @@ func CollectDockerMetrics(ctx context.Context, cfg server.DockerPillarConfig) *t
 				defer wg.Done()
 				for idx := range jobs {
 					c := &snapshots[idx]
-					if c.State != "running" {
+					if c.State != "running" || c.ContainerID == "missing" {
 						continue
 					}
 					cpuPct, memUsedMB, memLimMB, memPct := fetchContainerStats(ctx, client, c.ContainerID)
@@ -170,8 +232,11 @@ func CollectDockerMetrics(ctx context.Context, cfg server.DockerPillarConfig) *t
 	}
 
 	return &telemetry.DockerMetricsSnapshot{
-		DockerDaemonUp: true,
-		Containers:     snapshots,
+		DockerDaemonUp:        true,
+		TotalHostContainers:   totalHost,
+		RunningHostContainers: runningHost,
+		StoppedHostContainers: stoppedHost,
+		Containers:            snapshots,
 	}
 }
 

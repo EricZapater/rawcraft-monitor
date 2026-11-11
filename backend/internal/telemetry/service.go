@@ -145,6 +145,11 @@ func (s *Service) GetDashboardOverview(ctx context.Context, userID uuid.UUID, ro
 				summary.RebootRequired = latest.Host.RebootRequired
 			}
 			if latest.Docker != nil {
+				summary.DockerTotalHostContainers = latest.Docker.TotalHostContainers
+				summary.DockerHostRunningCount = latest.Docker.RunningHostContainers
+				summary.DockerHostStoppedCount = latest.Docker.StoppedHostContainers
+				summary.DockerMonitoredCount = len(latest.Docker.Containers)
+
 				for _, c := range latest.Docker.Containers {
 					if c.State == "running" && c.Health != "unhealthy" {
 						summary.DockerRunningCount++
