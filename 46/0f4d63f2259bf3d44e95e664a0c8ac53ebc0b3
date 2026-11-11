@@ -1,0 +1,86 @@
+backend/cmd/agent/main.go
+  h_42175f19913982 1-32
+backend/cmd/api/main.go
+  h_42175f19913982 1-111
+backend/go.mod
+  h_42175f19913982 1-47
+backend/go.sum
+  h_42175f19913982 1-106
+backend/internal/agent/collector_docker.go
+  h_42175f19913982 1-244
+backend/internal/agent/collector_host.go
+  h_42175f19913982 1-318
+backend/internal/agent/collector_http.go
+  h_42175f19913982 1-87
+backend/internal/agent/collector_postgres.go
+  h_42175f19913982 1-113
+backend/internal/agent/config.go
+  h_42175f19913982 1-67
+backend/internal/agent/evaluator.go
+  h_42175f19913982 1-541
+backend/internal/agent/evaluator_test.go
+  h_42175f19913982 1-167
+backend/internal/agent/runner.go
+  h_42175f19913982 1-180
+backend/internal/alert/handler.go
+  h_42175f19913982 1-120
+backend/internal/alert/model.go
+  h_42175f19913982 1-80
+backend/internal/alert/repository.go
+  h_42175f19913982 1-288
+backend/internal/alert/service.go
+  h_42175f19913982 1-224
+backend/internal/db/db.go
+  h_42175f19913982 1-156
+backend/internal/server/handler.go
+  h_42175f19913982 1-199
+backend/internal/server/model.go
+  h_42175f19913982 1-223
+backend/internal/server/repository.go
+  h_42175f19913982 1-271
+backend/internal/server/service.go
+  h_42175f19913982 1-290
+backend/internal/server/service_test.go
+  h_42175f19913982 1-59
+backend/internal/shared/auth.go
+  h_42175f19913982 1-172
+backend/internal/shared/auth_test.go
+  h_42175f19913982 1-24
+backend/internal/shared/cors.go
+  h_42175f19913982 1-39
+backend/internal/shared/errors.go
+  h_42175f19913982 1-17
+backend/internal/shared/smtp.go
+  h_42175f19913982 1-77
+backend/internal/telemetry/handler.go
+  h_42175f19913982 1-181
+backend/internal/telemetry/model.go
+  h_42175f19913982 1-176
+backend/internal/telemetry/repository.go
+  h_42175f19913982 1-241
+backend/internal/telemetry/service.go
+  h_42175f19913982 1-385
+backend/internal/user/handler.go
+  h_42175f19913982 1-221
+backend/internal/user/model.go
+  h_42175f19913982 1-61
+backend/internal/user/repository.go
+  h_42175f19913982 1-284
+backend/internal/user/service.go
+  h_42175f19913982 1-192
+backend/migrations/000001_init_schema.down.sql
+  h_42175f19913982 1-8
+backend/migrations/000001_init_schema.up.sql
+  h_42175f19913982 1-92
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "460f4d63f2259bf3d44e95e664a0c8ac53ebc0b3",
+  "prompts": {},
+  "humans": {
+    "h_42175f19913982": {
+      "author": "Èric Zapater <ericzm@ext.inditex.com>"
+    }
+  }
+}
