@@ -1,0 +1,46 @@
+CHANGELOG.md
+  h_42175f19913982 8-24
+VERSION
+  h_42175f19913982 1
+backend/internal/agent/collector_docker.go
+  h_42175f19913982 19-31,111-147,172-187,208,249,302
+backend/internal/server/handler.go
+  h_42175f19913982 15,41,426-465
+backend/internal/server/model.go
+  h_42175f19913982 200-207
+backend/internal/server/repository.go
+  h_42175f19913982 15-18
+backend/internal/server/service.go
+  h_42175f19913982 176-195
+backend/internal/telemetry/model.go
+  h_42175f19913982 44,60
+backend/internal/user/service.go
+  h_42175f19913982 55-68
+contracts/server.openapi.yaml
+  h_42175f19913982 543-558,750-789
+contracts/telemetry.openapi.yaml
+  h_42175f19913982 171-173,189-191
+frontend/src/modules/servers/api.ts
+  h_42175f19913982 24-25,85-92
+frontend/src/modules/servers/components/CopyApiKeyDialog.tsx
+  h_42175f19913982 1-115
+frontend/src/modules/servers/types.ts
+  h_42175f19913982 61-77,424-429,665-708
+frontend/src/modules/servers/views/ServersListView.tsx
+  h_42175f19913982 19,61,323-326,329-352,480-493,946-953
+frontend/src/modules/telemetry/types.ts
+  h_42175f19913982 167-168,175-176
+frontend/src/modules/telemetry/views/ServerDetailView.tsx
+  h_42175f19913982 21,29,117,152,301-308,548-550,625-638,644,707-709,1530-1537
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "b4c91969605709d68e5173550fb3ba12ba3fb514",
+  "prompts": {},
+  "humans": {
+    "h_42175f19913982": {
+      "author": "Èric Zapater <ericzm@ext.inditex.com>"
+    }
+  }
+}
