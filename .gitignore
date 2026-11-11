@@ -1,0 +1,22 @@
+# Dependencies & build outputs
+node_modules/
+frontend/node_modules/
+frontend/dist/
+.pnpm-store/
+
+# Go binaries & test outputs
+backend/server
+backend/api
+backend/rawcraft-agent
+backend/bin/
+*.test
+*.out
+
+# Environment secrets
+.env
+.env.local
+.env.backend
+.env.frontend
+
+# OS files
+.DS_Store

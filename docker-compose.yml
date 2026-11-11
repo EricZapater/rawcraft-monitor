@@ -1,0 +1,43 @@
+services:
+  rawcraft-monitor-backend:
+    image: ghcr.io/${GITHUB_REPOSITORY_OWNER:-ericzapater}/rawcraft-monitor-backend:latest
+    container_name: rawcraft-monitor-backend
+    restart: unless-stopped
+    env_file:
+      - .env.backend
+    environment:
+      - TZ=Europe/Madrid
+    networks:
+      - postgres-network
+      - web
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.rawcraft-monitor-backend.rule=Host(`api.monitor.ericzapater.cat`)"
+      - "traefik.http.routers.rawcraft-monitor-backend.entrypoints=websecure"
+      - "traefik.http.routers.rawcraft-monitor-backend.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.rawcraft-monitor-backend.service=rawcraft-monitor-backend"
+      - "traefik.http.services.rawcraft-monitor-backend.loadbalancer.server.port=8080"
+      - "traefik.docker.network=web"
+
+  rawcraft-monitor-frontend:
+    image: ghcr.io/${GITHUB_REPOSITORY_OWNER:-ericzapater}/rawcraft-monitor-frontend:latest
+    container_name: rawcraft-monitor-frontend
+    restart: unless-stopped
+    env_file:
+      - .env.frontend
+    networks:
+      - web
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.rawcraft-monitor-frontend.rule=Host(`monitor.ericzapater.cat`)"
+      - "traefik.http.routers.rawcraft-monitor-frontend.entrypoints=websecure"
+      - "traefik.http.routers.rawcraft-monitor-frontend.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.rawcraft-monitor-frontend.service=rawcraft-monitor-frontend"
+      - "traefik.http.services.rawcraft-monitor-frontend.loadbalancer.server.port=80"
+      - "traefik.docker.network=web"
+
+networks:
+  web:
+    external: true
+  postgres-network:
+    external: true
