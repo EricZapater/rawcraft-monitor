@@ -1,0 +1,677 @@
+openapi: 3.0.3
+info:
+  title: Rawcraft Monitor — Telemetry, Live Status & History API
+  version: 0.1.0
+  description: Contracte OpenAPI per a ingesta d'snapshots des de l'agent (`rawcraft-agent`), Dashboard general amb consola MOTD i `reboot_required`, detall de servidor en viu, gràfiques històriques i política de retenció de 365 dies (`HU-TEL-01`..`HU-TEL-05`).
+servers:
+  - url: /api/v1
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    agentApiKey:
+      type: apiKey
+      in: header
+      name: X-Agent-Key
+
+  schemas:
+    DiskMountUsage:
+      type: object
+      required:
+        - mount_point
+        - total_gb
+        - used_gb
+        - used_percent
+      properties:
+        mount_point:
+          type: string
+        total_gb:
+          type: number
+          format: double
+        used_gb:
+          type: number
+          format: double
+        used_percent:
+          type: number
+          format: double
+
+    HostMetricsSnapshot:
+      type: object
+      required:
+        - os_name
+        - kernel_version
+        - arch
+        - hostname
+        - uptime_seconds
+        - reboot_required
+        - load_1m
+        - load_5m
+        - load_15m
+        - memory_total_mb
+        - memory_used_mb
+        - memory_percent
+        - swap_total_mb
+        - swap_used_mb
+        - swap_percent
+        - processes_count
+        - users_logged_in
+        - network_interface
+        - ipv4_address
+        - disks
+      properties:
+        os_name:
+          type: string
+          example: "Ubuntu 24.04.1 LTS"
+        kernel_version:
+          type: string
+          example: "6.8.0-45-generic"
+        arch:
+          type: string
+          example: "amd64"
+        hostname:
+          type: string
+        uptime_seconds:
+          type: integer
+          format: int64
+        reboot_required:
+          type: boolean
+        load_1m:
+          type: number
+          format: double
+        load_5m:
+          type: number
+          format: double
+        load_15m:
+          type: number
+          format: double
+        memory_total_mb:
+          type: number
+          format: double
+        memory_used_mb:
+          type: number
+          format: double
+        memory_percent:
+          type: number
+          format: double
+        swap_total_mb:
+          type: number
+          format: double
+        swap_used_mb:
+          type: number
+          format: double
+        swap_percent:
+          type: number
+          format: double
+        processes_count:
+          type: integer
+        users_logged_in:
+          type: integer
+        network_interface:
+          type: string
+          example: "ens3"
+        ipv4_address:
+          type: string
+          example: "91.134.91.36"
+        agent_memory_mb:
+          type: number
+          format: double
+          description: Consum de memòria RAM RSS del propi procés `rawcraft-agent` (límit 30 MB).
+        disks:
+          type: array
+          items:
+            $ref: '#/components/schemas/DiskMountUsage'
+
+    DockerContainerSnapshot:
+      type: object
+      required:
+        - container_id
+        - name
+        - image
+        - state
+        - status
+        - health
+        - exit_code
+        - cpu_percent
+        - memory_used_mb
+        - memory_limit_mb
+        - memory_percent
+      properties:
+        container_id:
+          type: string
+        name:
+          type: string
+        image:
+          type: string
+        state:
+          type: string
+          enum: [running, exited, restarting, paused, dead, created]
+        status:
+          type: string
+          example: "Up 42 days (healthy)"
+        health:
+          type: string
+          enum: [healthy, unhealthy, starting, none]
+        exit_code:
+          type: integer
+        cpu_percent:
+          type: number
+          format: double
+        memory_used_mb:
+          type: number
+          format: double
+        memory_limit_mb:
+          type: number
+          format: double
+        memory_percent:
+          type: number
+          format: double
+
+    DockerMetricsSnapshot:
+      type: object
+      required:
+        - docker_daemon_up
+        - containers
+      properties:
+        docker_daemon_up:
+          type: boolean
+        containers:
+          type: array
+          items:
+            $ref: '#/components/schemas/DockerContainerSnapshot'
+
+    HttpEndpointSnapshot:
+      type: object
+      required:
+        - name
+        - url
+        - method
+        - expected_status_codes
+        - up
+        - status_code
+        - response_time_ms
+      properties:
+        name:
+          type: string
+        url:
+          type: string
+        method:
+          type: string
+        expected_status_codes:
+          type: array
+          items:
+            type: integer
+        up:
+          type: boolean
+        status_code:
+          type: integer
+        response_time_ms:
+          type: integer
+        error_message:
+          type: string
+          nullable: true
+
+    PostgresInstanceSnapshot:
+      type: object
+      required:
+        - name
+        - up
+        - latency_ms
+        - active_connections
+        - max_connections
+        - connections_percent
+        - database_size_mb
+        - long_running_queries
+        - locks_waiting
+      properties:
+        name:
+          type: string
+        up:
+          type: boolean
+        latency_ms:
+          type: integer
+        active_connections:
+          type: integer
+        max_connections:
+          type: integer
+        connections_percent:
+          type: number
+          format: double
+        database_size_mb:
+          type: number
+          format: double
+        long_running_queries:
+          type: integer
+        locks_waiting:
+          type: integer
+        error_message:
+          type: string
+          nullable: true
+
+    TelemetryIngestRequest:
+      type: object
+      required:
+        - server_id
+        - recorded_at
+      properties:
+        server_id:
+          type: string
+          format: uuid
+        recorded_at:
+          type: string
+          format: date-time
+        host:
+          $ref: '#/components/schemas/HostMetricsSnapshot'
+        docker:
+          $ref: '#/components/schemas/DockerMetricsSnapshot'
+        http_endpoints:
+          type: array
+          items:
+            $ref: '#/components/schemas/HttpEndpointSnapshot'
+        postgres_instances:
+          type: array
+          items:
+            $ref: '#/components/schemas/PostgresInstanceSnapshot'
+
+    ServerDashboardSummary:
+      type: object
+      required:
+        - server_id
+        - server_name
+        - status
+        - active_alerts_count
+        - reboot_required
+        - docker_running_count
+        - docker_stopped_count
+        - http_ok_count
+        - http_total_count
+        - postgres_up_count
+        - postgres_total_count
+      properties:
+        server_id:
+          type: string
+          format: uuid
+        server_name:
+          type: string
+        description:
+          type: string
+        status:
+          type: string
+          enum: [ONLINE, WARNING, CRITICAL, OFFLINE, UNKNOWN]
+        last_seen_at:
+          type: string
+          format: date-time
+          nullable: true
+        report_interval_seconds:
+          type: integer
+        active_alerts_count:
+          type: integer
+        reboot_required:
+          type: boolean
+        host:
+          $ref: '#/components/schemas/HostMetricsSnapshot'
+        docker_running_count:
+          type: integer
+        docker_stopped_count:
+          type: integer
+        http_ok_count:
+          type: integer
+        http_total_count:
+          type: integer
+        http_avg_latency_ms:
+          type: integer
+        postgres_up_count:
+          type: integer
+        postgres_total_count:
+          type: integer
+        postgres_max_conn_percent:
+          type: number
+          format: double
+        postgres_total_size_mb:
+          type: number
+          format: double
+
+    DashboardOverviewResponse:
+      type: object
+      required:
+        - total_servers
+        - online_servers
+        - total_running_containers
+        - total_down_containers
+        - http_endpoints_ok
+        - http_endpoints_total
+        - postgres_instances_up
+        - postgres_instances_total
+        - servers
+      properties:
+        total_servers:
+          type: integer
+        online_servers:
+          type: integer
+        total_running_containers:
+          type: integer
+        total_down_containers:
+          type: integer
+        http_endpoints_ok:
+          type: integer
+        http_endpoints_total:
+          type: integer
+        postgres_instances_up:
+          type: integer
+        postgres_instances_total:
+          type: integer
+        servers:
+          type: array
+          items:
+            $ref: '#/components/schemas/ServerDashboardSummary'
+
+    ServerLiveDetailResponse:
+      type: object
+      required:
+        - server_id
+        - server_name
+        - status
+        - recorded_at
+      properties:
+        server_id:
+          type: string
+          format: uuid
+        server_name:
+          type: string
+        status:
+          type: string
+          enum: [ONLINE, WARNING, CRITICAL, OFFLINE, UNKNOWN]
+        recorded_at:
+          type: string
+          format: date-time
+          nullable: true
+        host:
+          $ref: '#/components/schemas/HostMetricsSnapshot'
+        docker:
+          $ref: '#/components/schemas/DockerMetricsSnapshot'
+        http_endpoints:
+          type: array
+          items:
+            $ref: '#/components/schemas/HttpEndpointSnapshot'
+        postgres_instances:
+          type: array
+          items:
+            $ref: '#/components/schemas/PostgresInstanceSnapshot'
+
+    TelemetryHistoryPoint:
+      type: object
+      required:
+        - timestamp
+        - load_1m
+        - load_5m
+        - load_15m
+        - memory_percent
+        - swap_percent
+        - disk_root_percent
+        - processes_count
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        load_1m:
+          type: number
+          format: double
+        load_5m:
+          type: number
+          format: double
+        load_15m:
+          type: number
+          format: double
+        memory_percent:
+          type: number
+          format: double
+        swap_percent:
+          type: number
+          format: double
+        disk_root_percent:
+          type: number
+          format: double
+        processes_count:
+          type: integer
+        containers_cpu:
+          type: object
+          additionalProperties:
+            type: number
+            format: double
+        containers_memory_mb:
+          type: object
+          additionalProperties:
+            type: number
+            format: double
+        http_latency_ms:
+          type: object
+          additionalProperties:
+            type: integer
+        postgres_connections_percent:
+          type: object
+          additionalProperties:
+            type: number
+            format: double
+        postgres_size_mb:
+          type: object
+          additionalProperties:
+            type: number
+            format: double
+
+    ServerHistoryResponse:
+      type: object
+      required:
+        - server_id
+        - range
+        - points
+      properties:
+        server_id:
+          type: string
+          format: uuid
+        range:
+          type: string
+        points:
+          type: array
+          items:
+            $ref: '#/components/schemas/TelemetryHistoryPoint'
+
+    RetentionSettings:
+      type: object
+      required:
+        - retention_days
+        - updated_at
+      properties:
+        retention_days:
+          type: integer
+          minimum: 7
+          default: 365
+        updated_at:
+          type: string
+          format: date-time
+
+    UpdateRetentionRequest:
+      type: object
+      required:
+        - retention_days
+      properties:
+        retention_days:
+          type: integer
+          minimum: 7
+
+    ErrorResponse:
+      type: object
+      required: [error, message]
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+
+paths:
+  /agent/telemetry:
+    post:
+      operationId: ingestTelemetrySnapshot
+      summary: Rep l'snapshot periòdic de telemetria des de `rawcraft-agent` (HU-TEL-01)
+      tags: [telemetry]
+      security:
+        - agentApiKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TelemetryIngestRequest'
+      responses:
+        '202':
+          description: Snapshot acceptat i registrat
+        '400':
+          description: Payload invàlid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: API Key d'agent invàlida
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /telemetry/dashboard:
+    get:
+      operationId: getDashboardOverview
+      summary: Obté el Dashboard general dels servidors autoritzats amb bloc MOTD, SO i `reboot_required` (HU-TEL-02)
+      tags: [telemetry]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Resum del Dashboard
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardOverviewResponse'
+
+  /servers/{id}/telemetry/latest:
+    get:
+      operationId: getServerLatestTelemetry
+      summary: Obté l'últim detall complet d'un servidor en viu (Dockers amb CPU/RAM, HTTP i Postgres, HU-TEL-03)
+      tags: [telemetry]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Detall en viu del servidor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServerLiveDetailResponse'
+        '403':
+          description: Sense permís per a aquest servidor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Servidor no trobat
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /servers/{id}/telemetry/history:
+    get:
+      operationId: getServerTelemetryHistory
+      summary: Obté la sèrie temporal històrica d'un servidor per a les gràfiques (HU-TEL-04)
+      tags: [telemetry]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: range
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [6h, 24h, 7d, 30d, 365d]
+            default: 24h
+        - name: from
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: Sèries temporals per a gràfiques
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServerHistoryResponse'
+        '403':
+          description: Sense permís per a aquest servidor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /settings/retention:
+    get:
+      operationId: getRetentionSettings
+      summary: Consulta la política global de retenció d'històric (per defecte 365 dies, HU-TEL-05)
+      tags: [telemetry]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Configuració de retenció
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RetentionSettings'
+
+    put:
+      operationId: updateRetentionSettings
+      summary: Modifica els dies de retenció d'històric (només ADMIN, HU-TEL-05)
+      tags: [telemetry]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateRetentionRequest'
+      responses:
+        '200':
+          description: Retenció actualitzada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RetentionSettings'
+        '403':
+          description: Requereix rol ADMIN
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'

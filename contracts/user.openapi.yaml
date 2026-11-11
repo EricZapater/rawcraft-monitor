@@ -1,0 +1,418 @@
+openapi: 3.0.3
+info:
+  title: Rawcraft Monitor — Auth & Users API
+  version: 0.1.0
+  description: Contracte OpenAPI per a autenticació JWT, perfil d'usuari i gestió d'usuaris i permisos per servidor (`HU-USR-01`..`HU-USR-04`).
+servers:
+  - url: /api/v1
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    UserRole:
+      type: string
+      enum: [ADMIN, USER]
+
+    User:
+      type: object
+      required:
+        - id
+        - name
+        - email
+        - role
+        - is_active
+        - server_ids
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        role:
+          $ref: '#/components/schemas/UserRole'
+        is_active:
+          type: boolean
+        server_ids:
+          type: array
+          description: Llista d'UUIDs de servidors autoritzats per a aquest usuari (per a ADMIN té accés a tots).
+          items:
+            type: string
+            format: uuid
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 8
+
+    LoginResponse:
+      type: object
+      required: [token, user]
+      properties:
+        token:
+          type: string
+          description: JWT Bearer token
+        user:
+          $ref: '#/components/schemas/User'
+
+    ChangePasswordRequest:
+      type: object
+      required: [current_password, new_password]
+      properties:
+        current_password:
+          type: string
+        new_password:
+          type: string
+          minLength: 8
+
+    CreateUserRequest:
+      type: object
+      required: [name, email, password, role]
+      properties:
+        name:
+          type: string
+          minLength: 1
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 8
+        role:
+          $ref: '#/components/schemas/UserRole'
+        is_active:
+          type: boolean
+          default: true
+        server_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+
+    UpdateUserRequest:
+      type: object
+      required: [name, email, role, is_active, server_ids]
+      properties:
+        name:
+          type: string
+          minLength: 1
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 8
+          description: Opcional; si s'informa, restableix la contrasenya de l'usuari.
+        role:
+          $ref: '#/components/schemas/UserRole'
+        is_active:
+          type: boolean
+        server_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+
+    ErrorResponse:
+      type: object
+      required: [error, message]
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+
+paths:
+  /auth/login:
+    post:
+      operationId: login
+      summary: Inicia sessió amb email i contrasenya (HU-USR-01)
+      tags: [auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Autenticació correcta
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '400':
+          description: Dades d'entrada invàlides
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Credencials invàlides o compte inactiu
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/logout:
+    post:
+      operationId: logout
+      summary: Tanca la sessió de l'usuari actual (HU-USR-01)
+      tags: [auth]
+      security:
+        - bearerAuth: []
+      responses:
+        '204':
+          description: Sessió tancada
+
+  /auth/me:
+    get:
+      operationId: getCurrentUser
+      summary: Obté l'usuari autenticat i els seus servidors autoritzats (HU-USR-01)
+      tags: [auth]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Dades de l'usuari autenticat
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          description: Token invàlid o expirat
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/password:
+    put:
+      operationId: changeOwnPassword
+      summary: Canvia la contrasenya pròpia de l'usuari autenticat (HU-USR-04)
+      tags: [auth]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangePasswordRequest'
+      responses:
+        '204':
+          description: Contrasenya actualitzada correctament
+        '400':
+          description: Contrasenya actual incorrecta o format invàlid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: No autenticat
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /users:
+    get:
+      operationId: listUsers
+      summary: Llista tots els usuaris del sistema (només ADMIN, HU-USR-02)
+      tags: [users]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Llistat d'usuaris
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/User'
+        '403':
+          description: Requereix rol ADMIN
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    post:
+      operationId: createUser
+      summary: Dona d'alta un nou usuari i assigna servidors (només ADMIN, HU-USR-02)
+      tags: [users]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateUserRequest'
+      responses:
+        '201':
+          description: Usuari creat
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          description: Dades invàlides
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Requereix rol ADMIN
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Ja existeix un usuari amb aquest email
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /users/{id}:
+    get:
+      operationId: getUserById
+      summary: Obté el detall d'un usuari (només ADMIN)
+      tags: [users]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Detall de l'usuari
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '404':
+          description: Usuari no trobat
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    put:
+      operationId: updateUser
+      summary: Actualitza dades d'un usuari i els seus servidors assignats (només ADMIN, HU-USR-03)
+      tags: [users]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateUserRequest'
+      responses:
+        '200':
+          description: Usuari actualitzat
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          description: Operació invàlida (ex. desactivar-se a si mateix)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Requereix rol ADMIN
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Usuari no trobat
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Email duplicat
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      operationId: deleteUser
+      summary: Dona de baixa (soft-delete) un usuari amb confirmació explícita (només ADMIN, HU-USR-03)
+      tags: [users]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: confirm
+          in: query
+          required: true
+          description: Flag de confirmació obligatori per a entitat sensible (`confirm=true`)
+          schema:
+            type: boolean
+      responses:
+        '204':
+          description: Usuari donat de baixa (soft-delete)
+        '400':
+          description: Falta `confirm=true` o intent d'auto-eliminació
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Requereix rol ADMIN
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Usuari no trobat
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'

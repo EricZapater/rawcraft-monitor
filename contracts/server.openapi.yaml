@@ -1,0 +1,656 @@
+openapi: 3.0.3
+info:
+  title: Rawcraft Monitor — Servers & YAML Configuration API
+  version: 0.1.0
+  description: Contracte OpenAPI per a l'inventari de servidors, configuració de les 4 potetes i llindars, rotació d'API keys i generació del `config.yaml` (`HU-SRV-01`..`HU-SRV-03`, `HU-INF-04`).
+servers:
+  - url: /api/v1
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    ServerStatus:
+      type: string
+      enum: [ONLINE, WARNING, CRITICAL, OFFLINE, UNKNOWN]
+
+    HostThresholdsConfig:
+      type: object
+      required:
+        - sustained_checks
+      properties:
+        sustained_checks:
+          type: integer
+          default: 4
+        max_load_1m:
+          type: number
+          format: double
+          nullable: true
+        max_disk_percent:
+          type: number
+          format: double
+          nullable: true
+        max_memory_percent:
+          type: number
+          format: double
+          nullable: true
+        max_swap_percent:
+          type: number
+          format: double
+          nullable: true
+        max_processes:
+          type: integer
+          nullable: true
+        max_users_logged_in:
+          type: integer
+          nullable: true
+
+    HostPillarConfig:
+      type: object
+      required:
+        - enabled
+        - collect_os_info
+        - collect_reboot_required
+        - collect_load
+        - collect_disk
+        - collect_memory
+        - collect_swap
+        - collect_processes
+        - collect_users
+        - collect_network_ip
+        - mount_points
+        - thresholds
+      properties:
+        enabled:
+          type: boolean
+          default: true
+        collect_os_info:
+          type: boolean
+          default: true
+        collect_reboot_required:
+          type: boolean
+          default: true
+        collect_load:
+          type: boolean
+          default: true
+        collect_disk:
+          type: boolean
+          default: true
+        collect_memory:
+          type: boolean
+          default: true
+        collect_swap:
+          type: boolean
+          default: true
+        collect_processes:
+          type: boolean
+          default: true
+        collect_users:
+          type: boolean
+          default: true
+        collect_network_ip:
+          type: boolean
+          default: true
+        network_interface:
+          type: string
+          description: Interfície preferida (ex. `ens3`, `eth0`) o buit per autodetecció.
+        mount_points:
+          type: array
+          items:
+            type: string
+          default: ["/"]
+        thresholds:
+          $ref: '#/components/schemas/HostThresholdsConfig'
+
+    DockerPillarConfig:
+      type: object
+      required:
+        - enabled
+        - socket_path
+        - collect_container_stats
+        - alert_on_container_down
+        - required_containers
+        - ignore_containers
+      properties:
+        enabled:
+          type: boolean
+          default: true
+        socket_path:
+          type: string
+          default: "/var/run/docker.sock"
+        collect_container_stats:
+          type: boolean
+          default: true
+        alert_on_container_down:
+          type: boolean
+          default: true
+        required_containers:
+          type: array
+          items:
+            type: string
+        ignore_containers:
+          type: array
+          items:
+            type: string
+        max_container_cpu_percent:
+          type: number
+          format: double
+          nullable: true
+        max_container_memory_percent:
+          type: number
+          format: double
+          nullable: true
+
+    HttpEndpointCheckConfig:
+      type: object
+      required:
+        - name
+        - url
+        - method
+        - expected_status_codes
+        - timeout_seconds
+      properties:
+        name:
+          type: string
+        url:
+          type: string
+          format: uri
+        method:
+          type: string
+          enum: [GET, HEAD]
+          default: GET
+        expected_status_codes:
+          type: array
+          items:
+            type: integer
+          default: [200, 202]
+        timeout_seconds:
+          type: integer
+          default: 5
+
+    PostgresInstanceConfig:
+      type: object
+      required:
+        - name
+        - host
+        - port
+        - user
+        - dbname
+        - sslmode
+        - max_connections_percent
+        - long_query_seconds
+        - max_long_running_queries
+      properties:
+        name:
+          type: string
+        host:
+          type: string
+          default: "127.0.0.1"
+        port:
+          type: integer
+          default: 5432
+        user:
+          type: string
+        password:
+          type: string
+        dbname:
+          type: string
+          default: "postgres"
+        sslmode:
+          type: string
+          default: "disable"
+        max_connections_percent:
+          type: number
+          format: double
+          default: 80.0
+        long_query_seconds:
+          type: integer
+          default: 60
+        max_long_running_queries:
+          type: integer
+          default: 1
+
+    PostgresPillarConfig:
+      type: object
+      required:
+        - enabled
+        - instances
+      properties:
+        enabled:
+          type: boolean
+          default: false
+        instances:
+          type: array
+          items:
+            $ref: '#/components/schemas/PostgresInstanceConfig'
+
+    SmtpNotificationConfig:
+      type: object
+      required:
+        - enabled
+        - use_global_smtp
+        - to_emails
+      properties:
+        enabled:
+          type: boolean
+          default: true
+        use_global_smtp:
+          type: boolean
+          default: true
+        host:
+          type: string
+        port:
+          type: integer
+          default: 587
+        username:
+          type: string
+        password:
+          type: string
+        from_email:
+          type: string
+        to_emails:
+          type: array
+          items:
+            type: string
+            format: email
+
+    ServerMonitoringConfig:
+      type: object
+      required:
+        - check_interval_seconds
+        - report_interval_seconds
+        - central_unreachable_failures
+        - host
+        - docker
+        - http_endpoints
+        - postgres
+        - smtp
+      properties:
+        check_interval_seconds:
+          type: integer
+          default: 15
+        report_interval_seconds:
+          type: integer
+          default: 300
+        central_unreachable_failures:
+          type: integer
+          default: 3
+        host:
+          $ref: '#/components/schemas/HostPillarConfig'
+        docker:
+          $ref: '#/components/schemas/DockerPillarConfig'
+        http_endpoints:
+          type: array
+          items:
+            $ref: '#/components/schemas/HttpEndpointCheckConfig'
+        postgres:
+          $ref: '#/components/schemas/PostgresPillarConfig'
+        smtp:
+          $ref: '#/components/schemas/SmtpNotificationConfig'
+
+    Server:
+      type: object
+      required:
+        - id
+        - name
+        - status
+        - config
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+        status:
+          $ref: '#/components/schemas/ServerStatus'
+        last_seen_at:
+          type: string
+          format: date-time
+          nullable: true
+        os_name:
+          type: string
+          nullable: true
+        kernel_version:
+          type: string
+          nullable: true
+        ipv4_address:
+          type: string
+          nullable: true
+        reboot_required:
+          type: boolean
+          default: false
+        config:
+          $ref: '#/components/schemas/ServerMonitoringConfig'
+        api_key_preview:
+          type: string
+          description: Prefix emmascarat de l'API key (ex. `rcm_live_9b2f...`)
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    CreateServerRequest:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          minLength: 1
+        description:
+          type: string
+        check_interval_seconds:
+          type: integer
+          default: 15
+        report_interval_seconds:
+          type: integer
+          default: 300
+
+    CreateServerResponse:
+      type: object
+      required:
+        - server
+        - api_key
+      properties:
+        server:
+          $ref: '#/components/schemas/Server'
+        api_key:
+          type: string
+          description: Clau completa generada per a l'agent d'aquest servidor.
+
+    UpdateServerRequest:
+      type: object
+      required:
+        - name
+        - config
+      properties:
+        name:
+          type: string
+          minLength: 1
+        description:
+          type: string
+        config:
+          $ref: '#/components/schemas/ServerMonitoringConfig'
+
+    RotateApiKeyResponse:
+      type: object
+      required:
+        - server_id
+        - api_key
+      properties:
+        server_id:
+          type: string
+          format: uuid
+        api_key:
+          type: string
+
+    ServerYamlBundleResponse:
+      type: object
+      required:
+        - server_id
+        - server_name
+        - filename
+        - config_yaml
+        - systemd_service
+        - install_commands
+      properties:
+        server_id:
+          type: string
+          format: uuid
+        server_name:
+          type: string
+        filename:
+          type: string
+        config_yaml:
+          type: string
+          description: Contingut complet del fitxer `config.yaml` llest per a `rawcraft-agent`.
+        systemd_service:
+          type: string
+          description: Contingut de la unitat `/etc/systemd/system/rawcraft-agent.service` amb `GOMEMLIMIT=20MiB` i `MemoryMax=30M`.
+        install_commands:
+          type: string
+          description: Comandes d'instal·lació ràpida al servidor Linux.
+
+    ErrorResponse:
+      type: object
+      required: [error, message]
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+
+paths:
+  /servers:
+    get:
+      operationId: listServers
+      summary: Llista els servidors autoritzats per a l'usuari autenticat (HU-SRV-01)
+      tags: [servers]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Llista de servidors
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Server'
+
+    post:
+      operationId: createServer
+      summary: Dona d'alta un nou servidor i genera el seu UUID i API Key (només ADMIN, HU-SRV-01)
+      tags: [servers]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateServerRequest'
+      responses:
+        '201':
+          description: Servidor creat
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateServerResponse'
+        '400':
+          description: Dades invàlides
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Requereix rol ADMIN
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /servers/{id}:
+    get:
+      operationId: getServerById
+      summary: Obté la fitxa i la configuració d'un servidor autoritzat (HU-SRV-02)
+      tags: [servers]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Configuració del servidor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Server'
+        '403':
+          description: Sense permís per a aquest servidor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Servidor no trobat
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    put:
+      operationId: updateServer
+      summary: Actualitza les 4 potetes, llindars i destinataris SMTP d'un servidor (només ADMIN, HU-SRV-02)
+      tags: [servers]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateServerRequest'
+      responses:
+        '200':
+          description: Servidor actualitzat
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Server'
+        '400':
+          description: Configuració invàlida
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Requereix rol ADMIN
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Servidor no trobat
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      operationId: deleteServer
+      summary: Dona de baixa (soft-delete) un servidor amb confirmació explícita (només ADMIN, HU-SRV-01)
+      tags: [servers]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: confirm
+          in: query
+          required: true
+          schema:
+            type: boolean
+      responses:
+        '204':
+          description: Servidor donat de baixa (soft-delete)
+        '400':
+          description: Falta `confirm=true`
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Requereix rol ADMIN
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /servers/{id}/rotate-key:
+    post:
+      operationId: rotateServerApiKey
+      summary: Regenera l'API Key d'un servidor invalidant l'anterior (només ADMIN, HU-SRV-01)
+      tags: [servers]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Nova API Key generada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RotateApiKeyResponse'
+        '403':
+          description: Requereix rol ADMIN
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /servers/{id}/config-yaml:
+    get:
+      operationId: getServerConfigYaml
+      summary: Genera i retorna el `config.yaml` i la unitat `systemd` del servidor (només ADMIN, HU-SRV-03, HU-INF-04)
+      tags: [servers]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Bundle YAML i systemd generat
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServerYamlBundleResponse'
+        '403':
+          description: Requereix rol ADMIN
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Servidor no trobat
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'

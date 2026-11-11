@@ -1,0 +1,264 @@
+openapi: 3.0.3
+info:
+  title: Rawcraft Monitor — Alerts & Heartbeat API
+  version: 0.1.0
+  description: Contracte OpenAPI per a notificació immediata d'alertes des dels agents (`FIRING` / `RESOLVED`), Heartbeat del Punt Central i panell d'històric d'alertes (`HU-ALT-01`..`HU-ALT-03`).
+servers:
+  - url: /api/v1
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    agentApiKey:
+      type: apiKey
+      in: header
+      name: X-Agent-Key
+
+  schemas:
+    AlertStatus:
+      type: string
+      enum: [FIRING, RESOLVED]
+
+    AlertCategory:
+      type: string
+      enum: [HOST, DOCKER, HTTP_ENDPOINT, POSTGRES, HEARTBEAT]
+
+    AlertSeverity:
+      type: string
+      enum: [WARNING, CRITICAL]
+
+    AgentAlertEventRequest:
+      type: object
+      required:
+        - server_id
+        - fingerprint
+        - status
+        - category
+        - severity
+        - target_name
+        - title
+        - message
+        - occurred_at
+      properties:
+        server_id:
+          type: string
+          format: uuid
+        fingerprint:
+          type: string
+          description: Clau determinista de la regla/recurs (ex. `docker:nasc-backend` o `host:memory_percent`) per correlacionar `FIRING` i `RESOLVED`.
+        status:
+          $ref: '#/components/schemas/AlertStatus'
+        category:
+          $ref: '#/components/schemas/AlertCategory'
+        severity:
+          $ref: '#/components/schemas/AlertSeverity'
+        target_name:
+          type: string
+          example: "nasc-backend"
+        title:
+          type: string
+        message:
+          type: string
+        current_value:
+          type: string
+          nullable: true
+        threshold_value:
+          type: string
+          nullable: true
+        smtp_sent_by_agent:
+          type: boolean
+          default: false
+        occurred_at:
+          type: string
+          format: date-time
+
+    Alert:
+      type: object
+      required:
+        - id
+        - server_id
+        - server_name
+        - fingerprint
+        - status
+        - category
+        - severity
+        - target_name
+        - title
+        - message
+        - acknowledged
+        - fired_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        server_id:
+          type: string
+          format: uuid
+        server_name:
+          type: string
+        fingerprint:
+          type: string
+        status:
+          $ref: '#/components/schemas/AlertStatus'
+        category:
+          $ref: '#/components/schemas/AlertCategory'
+        severity:
+          $ref: '#/components/schemas/AlertSeverity'
+        target_name:
+          type: string
+        title:
+          type: string
+        message:
+          type: string
+        current_value:
+          type: string
+          nullable: true
+        threshold_value:
+          type: string
+          nullable: true
+        acknowledged:
+          type: boolean
+        acknowledged_by:
+          type: string
+          nullable: true
+        acknowledged_at:
+          type: string
+          format: date-time
+          nullable: true
+        fired_at:
+          type: string
+          format: date-time
+        resolved_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    AlertsListResponse:
+      type: object
+      required:
+        - active_firing_count
+        - items
+      properties:
+        active_firing_count:
+          type: integer
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Alert'
+
+    ErrorResponse:
+      type: object
+      required: [error, message]
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+
+paths:
+  /agent/alerts:
+    post:
+      operationId: reportAgentAlertEvent
+      summary: Notificació immediata d'obertura (`FIRING`) o resolució (`RESOLVED`) d'alerta des del bucle ràpid de l'agent (HU-ALT-01)
+      tags: [alerts]
+      security:
+        - agentApiKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentAlertEventRequest'
+      responses:
+        '200':
+          description: Esdeveniment d'alerta registrat/actualitzat
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Alert'
+        '401':
+          description: API Key d'agent invàlida
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /alerts:
+    get:
+      operationId: listAlerts
+      summary: Llista les alertes actives i l'històric dels servidors autoritzats per a l'usuari (HU-ALT-03)
+      tags: [alerts]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: server_id
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/AlertStatus'
+        - name: category
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/AlertCategory'
+        - name: severity
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/AlertSeverity'
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 100
+      responses:
+        '200':
+          description: Llistat d'alertes
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlertsListResponse'
+
+  /alerts/{id}/acknowledge:
+    post:
+      operationId: acknowledgeAlert
+      summary: Marca una alerta activa com a reconeguda (`acknowledged`) per l'usuari actual (HU-ALT-03)
+      tags: [alerts]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Alerta reconeguda
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Alert'
+        '403':
+          description: Sense permís per al servidor d'aquesta alerta
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Alerta no trobada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
