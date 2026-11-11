@@ -19,4 +19,9 @@ export const alertsApi = {
     const { data } = await apiClient.post<Alert>(`/alerts/${id}/acknowledge`);
     return data;
   },
+
+  async resolveAlert(id: string): Promise<Alert> {
+    const { data } = await apiClient.post<Alert>(`/alerts/${id}/resolve`);
+    return data;
+  },
 };

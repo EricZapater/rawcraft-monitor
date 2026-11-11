@@ -5,6 +5,13 @@ Tots els canvis rellevants d'aquest projecte es documenten en aquest fitxer.
 El format es basa en [Keep a Changelog](https://keepachangelog.com/ca/1.0.0/),
 i aquest projecte segueix [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.6] - 2026-11-11
+
+### Fixed
+- **Reconciliació automàtica d'alertes recuperades i acció manual "Marcar com a resolta"**:
+  - A [`telemetry/service.go`](backend/internal/telemetry/service.go), quan arriba un snapshot de telemetria amb Postgres abastable, endpoints HTTP sans, contenidors en marxa o disc sota llindar, qualsevol alerta que hagués quedat en estat `FIRING` es tanca automàticament a `RESOLVED`.
+  - Afegit endpoint `POST /api/v1/alerts/:id/resolve` ([`alert/handler.go`](backend/internal/alert/handler.go)) i botó **Marcar com a resolta** a la taula d'incidències ([`AlertsView.tsx`](frontend/src/modules/alerts/views/AlertsView.tsx)) perquè els operadors puguin tancar incidències manualment en qualsevol moment.
+
 ## [0.1.5] - 2026-11-11
 
 ### Added

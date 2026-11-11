@@ -3,6 +3,7 @@ package telemetry
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"time"
 
@@ -55,6 +56,9 @@ func (s *Service) IngestSnapshot(ctx context.Context, authenticatedServerID uuid
 
 	// Si el servidor estava marcat com a SERVER_OFFLINE, el resol automàticament (`HU-ALT-02`).
 	s.alertService.ResolveServerOfflineIfFiring(ctx, srv)
+
+	// Reconciliar automàticament alertes FIRING que han recuperat l'estat saludable
+	s.reconcileRecoveredSnapshotAlerts(ctx, srv, req)
 
 	firingCount, _ := s.alertService.CountFiringByServer(ctx, authenticatedServerID)
 	computedStatus := evaluateServerStatusFromSnapshot(req, firingCount)
@@ -387,4 +391,74 @@ func (s *Service) StartRetentionWorker(ctx context.Context) {
 			}
 		}
 	}()
+}
+
+func (s *Service) reconcileRecoveredSnapshotAlerts(ctx context.Context, srv *server.Server, req TelemetryIngestRequest) {
+	// 1. PostgreSQL abastable
+	for _, pg := range req.PostgresInstances {
+		if pg.Up {
+			fp := fmt.Sprintf("postgres:up:%s", pg.Name)
+			curVal := fmt.Sprintf("UP (%dms)", pg.LatencyMs)
+			s.alertService.ResolveResourceAlertIfFiring(
+				ctx, srv.ID, srv.Name, fp,
+				alert.CategoryPostgres, pg.Name,
+				fmt.Sprintf("Recuperat: Instància PostgreSQL %s abastable", pg.Name),
+				fmt.Sprintf("La instància PostgreSQL %s torna a respondre correctament (SELECT 1 OK).", pg.Name),
+				curVal,
+			)
+		}
+	}
+
+	// 2. Endpoints HTTP saludables
+	for _, ep := range req.HttpEndpoints {
+		if ep.Up {
+			fp := fmt.Sprintf("http:%s", ep.Name)
+			curVal := fmt.Sprintf("HTTP %d (%dms)", ep.StatusCode, ep.ResponseTimeMs)
+			s.alertService.ResolveResourceAlertIfFiring(
+				ctx, srv.ID, srv.Name, fp,
+				alert.CategoryHttpEndpoint, ep.Name,
+				fmt.Sprintf("Recuperat: Endpoint HTTP %s respon OK", ep.Name),
+				fmt.Sprintf("L'endpoint HTTP %s ha tornat a respondre amb codi esperat.", ep.Name),
+				curVal,
+			)
+		}
+	}
+
+	// 3. Contenidors Docker en marxa
+	if req.Docker != nil {
+		for _, c := range req.Docker.Containers {
+			if c.State == "running" && c.Health != "unhealthy" {
+				fp := fmt.Sprintf("docker:container:%s", c.Name)
+				curVal := fmt.Sprintf("%s (%s)", c.State, c.Health)
+				s.alertService.ResolveResourceAlertIfFiring(
+					ctx, srv.ID, srv.Name, fp,
+					alert.CategoryDocker, c.Name,
+					fmt.Sprintf("Recuperat: Contenidor Docker %s en marxa", c.Name),
+					fmt.Sprintf("El contenidor Docker %s torna a estar en execució.", c.Name),
+					curVal,
+				)
+			}
+		}
+	}
+
+	// 4. Mètriques de Host (Disc sota llindar)
+	if req.Host != nil {
+		maxDisk := 85.0
+		if srv.Config.Host.Thresholds.MaxDiskPercent != nil && *srv.Config.Host.Thresholds.MaxDiskPercent > 0 {
+			maxDisk = *srv.Config.Host.Thresholds.MaxDiskPercent
+		}
+		for _, d := range req.Host.Disks {
+			if d.UsedPercent <= maxDisk {
+				fp := fmt.Sprintf("host:disk:%s", d.MountPoint)
+				curVal := fmt.Sprintf("%.1f%%", d.UsedPercent)
+				s.alertService.ResolveResourceAlertIfFiring(
+					ctx, srv.ID, srv.Name, fp,
+					alert.CategoryHost, d.MountPoint,
+					fmt.Sprintf("Recuperat: Ús de Disc sota llindar (%s)", d.MountPoint),
+					fmt.Sprintf("L'ús de disc a %s (%.1f%%) ha baixat per sota del límit (%.1f%%).", d.MountPoint, d.UsedPercent, maxDisk),
+					curVal,
+				)
+			}
+		}
+	}
 }

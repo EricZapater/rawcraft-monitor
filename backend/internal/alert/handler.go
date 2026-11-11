@@ -37,6 +37,7 @@ func (h *Handler) RegisterRoutes(v1 *gin.RouterGroup) {
 	{
 		alertsGroup.GET("", h.ListAlerts)
 		alertsGroup.POST("/:id/acknowledge", h.AcknowledgeAlert)
+		alertsGroup.POST("/:id/resolve", h.ResolveAlert)
 	}
 }
 
@@ -109,6 +110,34 @@ func (h *Handler) AcknowledgeAlert(c *gin.Context) {
 			return
 		}
 		shared.RespondError(c, http.StatusInternalServerError, "INTERNAL_ERROR", "Error reconeixent l'alerta")
+		return
+	}
+	if !allowed {
+		shared.RespondError(c, http.StatusForbidden, "FORBIDDEN", "Sense permís per al servidor d'aquesta alerta")
+		return
+	}
+
+	c.JSON(http.StatusOK, a)
+}
+
+func (h *Handler) ResolveAlert(c *gin.Context) {
+	alertID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		shared.RespondError(c, http.StatusNotFound, "NOT_FOUND", "Alerta no trobada")
+		return
+	}
+
+	userID, _ := shared.GetAuthUserID(c)
+	role := shared.GetAuthUserRole(c)
+	email := shared.GetAuthUserEmail(c)
+
+	a, allowed, err := h.service.ManualResolve(c.Request.Context(), userID, role, email, alertID)
+	if err != nil {
+		if errors.Is(err, ErrAlertNotFound) {
+			shared.RespondError(c, http.StatusNotFound, "NOT_FOUND", "Alerta no trobada")
+			return
+		}
+		shared.RespondError(c, http.StatusInternalServerError, "INTERNAL_ERROR", "Error resolent l'alerta")
 		return
 	}
 	if !allowed {

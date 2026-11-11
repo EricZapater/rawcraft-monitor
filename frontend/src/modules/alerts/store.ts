@@ -15,6 +15,7 @@ export interface AlertsState {
 
   fetchAlerts: (params?: ListAlertsQuery) => Promise<void>;
   acknowledgeAlert: (id: string) => Promise<void>;
+  resolveAlert: (id: string) => Promise<void>;
   clearError: () => void;
 }
 
@@ -61,6 +62,21 @@ export const useAlertsStore = create<AlertsState>((set) => ({
       }));
     } catch (err: unknown) {
       const msg = extractAlertError(err, "No s'ha pogut reconèixer l'alerta.");
+      set({ error: msg });
+      throw new Error(msg);
+    }
+  },
+
+  resolveAlert: async (id: string) => {
+    set({ error: null });
+    try {
+      const updated = await alertsApi.resolveAlert(id);
+      set((state) => ({
+        items: state.items.map((item) => (item.id === id ? updated : item)),
+        activeFiringCount: Math.max(0, state.activeFiringCount - 1),
+      }));
+    } catch (err: unknown) {
+      const msg = extractAlertError(err, "No s'ha pogut tancar l'alerta.");
       set({ error: msg });
       throw new Error(msg);
     }

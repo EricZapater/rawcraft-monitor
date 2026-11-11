@@ -32,6 +32,7 @@ export const AlertsView: React.FC = () => {
     error,
     fetchAlerts,
     acknowledgeAlert,
+    resolveAlert,
     clearError,
   } = useAlertsStore();
   const { servers, fetchServers } = useServersStore();
@@ -42,6 +43,7 @@ export const AlertsView: React.FC = () => {
   const [categoryFilter, setCategoryFilter] = useState<AlertCategory | ''>('');
   const [severityFilter, setSeverityFilter] = useState<AlertSeverity | ''>('');
   const [ackingId, setAckingId] = useState<string | null>(null);
+  const [resolvingId, setResolvingId] = useState<string | null>(null);
 
   useEffect(() => {
     void fetchServers();
@@ -65,6 +67,17 @@ export const AlertsView: React.FC = () => {
       // Error surfaced via store
     } finally {
       setAckingId(null);
+    }
+  };
+
+  const handleResolve = async (alertItem: Alert) => {
+    setResolvingId(alertItem.id);
+    try {
+      await resolveAlert(alertItem.id);
+    } catch {
+      // Error surfaced via store
+    } finally {
+      setResolvingId(null);
     }
   };
 
@@ -357,29 +370,54 @@ export const AlertsView: React.FC = () => {
                               : `${item.resolved_at ? new Date(item.resolved_at).toLocaleString('ca-ES') : ''} (${formatDuration(item.fired_at, item.resolved_at)})`}
                           </td>
                           <td style={{ padding: '14px 16px' }}>
-                            {item.acknowledged ? (
-                              <Typography sx={{ fontSize: 12, color: '#166534', fontWeight: 500 }}>
-                                Reconeguda{item.acknowledged_by ? ` (${item.acknowledged_by})` : ''}
-                              </Typography>
-                            ) : isFiring ? (
-                              <Button
-                                variant="outlined"
-                                size="small"
-                                disabled={ackingId === item.id}
-                                onClick={() => void handleAck(item)}
-                                sx={{
-                                  textTransform: 'none',
-                                  borderColor: '#e2e8f0',
-                                  color: '#1e293b',
-                                  bgcolor: '#ffffff',
-                                  fontSize: 12,
-                                }}
-                              >
-                                {ackingId === item.id ? '...' : 'Acknowledge'}
-                              </Button>
+                            {isFiring ? (
+                              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75, alignItems: 'flex-start' }}>
+                                {item.acknowledged ? (
+                                  <Typography sx={{ fontSize: 11.5, color: '#166534', fontWeight: 600 }}>
+                                    ✓ Reconeguda{item.acknowledged_by ? ` (${item.acknowledged_by})` : ''}
+                                  </Typography>
+                                ) : (
+                                  <Button
+                                    variant="outlined"
+                                    size="small"
+                                    disabled={ackingId === item.id || resolvingId === item.id}
+                                    onClick={() => void handleAck(item)}
+                                    sx={{
+                                      textTransform: 'none',
+                                      borderColor: '#e2e8f0',
+                                      color: '#1e293b',
+                                      bgcolor: '#ffffff',
+                                      fontSize: 11.5,
+                                      py: 0.25,
+                                    }}
+                                  >
+                                    {ackingId === item.id ? '...' : 'Reconèixer (ACK)'}
+                                  </Button>
+                                )}
+                                <Button
+                                  variant="outlined"
+                                  size="small"
+                                  disabled={resolvingId === item.id || ackingId === item.id}
+                                  onClick={() => void handleResolve(item)}
+                                  sx={{
+                                    textTransform: 'none',
+                                    borderColor: '#bbf7d0',
+                                    color: '#166534',
+                                    bgcolor: '#f0fdf4',
+                                    fontSize: 11.5,
+                                    py: 0.25,
+                                    '&:hover': {
+                                      bgcolor: '#dcfce7',
+                                      borderColor: '#86efac',
+                                    },
+                                  }}
+                                >
+                                  {resolvingId === item.id ? 'Tancant...' : 'Marcar com a resolta'}
+                                </Button>
+                              </Box>
                             ) : (
                               <Typography sx={{ fontSize: 12, color: '#64748b' }}>
-                                Tancada
+                                Resolta
                               </Typography>
                             )}
                           </td>

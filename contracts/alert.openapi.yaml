@@ -262,3 +262,37 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+
+  /alerts/{id}/resolve:
+    post:
+      operationId: resolveAlert
+      summary: Tanca manualment una alerta activa (`FIRING -> RESOLVED`) per l'usuari actual
+      tags: [alerts]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Alerta resolta manualment
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Alert'
+        '403':
+          description: Sense permís per al servidor d'aquesta alerta
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Alerta no trobada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'

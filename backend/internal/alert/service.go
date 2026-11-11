@@ -123,6 +123,60 @@ func (s *Service) Acknowledge(ctx context.Context, userID uuid.UUID, role, userE
 	return updated, true, nil
 }
 
+func (s *Service) ManualResolve(ctx context.Context, userID uuid.UUID, role, userEmail string, alertID uuid.UUID) (*Alert, bool, error) {
+	existing, err := s.repo.GetByID(ctx, alertID)
+	if err != nil {
+		return nil, false, err
+	}
+
+	allowed, err := s.userService.CanAccessServer(ctx, userID, role, existing.ServerID)
+	if err != nil {
+		return nil, false, err
+	}
+	if !allowed {
+		return nil, false, nil
+	}
+
+	updated, err := s.repo.ManualResolve(ctx, alertID, userEmail)
+	if err != nil {
+		return nil, true, err
+	}
+	return updated, true, nil
+}
+
+// ResolveResourceAlertIfFiring tanca una alerta pel seu fingerprint si està en estat FIRING.
+func (s *Service) ResolveResourceAlertIfFiring(
+	ctx context.Context,
+	serverID uuid.UUID,
+	serverName string,
+	fingerprint string,
+	category AlertCategory,
+	targetName string,
+	title string,
+	message string,
+	currentVal string,
+) {
+	existing, err := s.repo.GetFiringByFingerprint(ctx, serverID, fingerprint)
+	if err != nil || existing == nil {
+		return
+	}
+
+	req := AgentAlertEventRequest{
+		ServerID:     serverID,
+		Fingerprint:  fingerprint,
+		Status:       StatusResolved,
+		Category:     category,
+		Severity:     existing.Severity,
+		TargetName:   targetName,
+		Title:        title,
+		Message:      message,
+		CurrentValue: &currentVal,
+		OccurredAt:   time.Now(),
+	}
+
+	_, _, _ = s.repo.ResolveAlert(ctx, req, serverName)
+}
+
 func (s *Service) CountFiringByServer(ctx context.Context, serverID uuid.UUID) (int, error) {
 	return s.repo.CountFiringByServer(ctx, serverID)
 }

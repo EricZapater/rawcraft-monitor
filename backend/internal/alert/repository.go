@@ -269,6 +269,26 @@ func (r *Repository) Acknowledge(ctx context.Context, id uuid.UUID, byEmail stri
 	return r.GetByID(ctx, id)
 }
 
+func (r *Repository) ManualResolve(ctx context.Context, id uuid.UUID, byEmail string) (*Alert, error) {
+	tag, err := r.pool.Exec(ctx, `
+		UPDATE alerts
+		SET status = 'RESOLVED',
+		    acknowledged = TRUE,
+		    acknowledged_by = COALESCE(acknowledged_by, $1),
+		    acknowledged_at = COALESCE(acknowledged_at, NOW()),
+		    resolved_at = NOW(),
+		    updated_at = NOW()
+		WHERE id = $2
+	`, byEmail, id)
+	if err != nil {
+		return nil, err
+	}
+	if tag.RowsAffected() == 0 {
+		return nil, ErrAlertNotFound
+	}
+	return r.GetByID(ctx, id)
+}
+
 func (r *Repository) CountFiringByServer(ctx context.Context, serverID uuid.UUID) (int, error) {
 	var count int
 	err := r.pool.QueryRow(ctx, `
