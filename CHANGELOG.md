@@ -5,6 +5,11 @@ Tots els canvis rellevants d'aquest projecte es documenten en aquest fitxer.
 El format es basa en [Keep a Changelog](https://keepachangelog.com/ca/1.0.0/),
 i aquest projecte segueix [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.3] - 2026-11-11
+
+### Changed
+- Actualitzat el nom d'usuari per defecte de PostgreSQL a [`ServerConfigYamlView.tsx`](frontend/src/modules/servers/views/ServerConfigYamlView.tsx) de `pg_monitor` a `rawcraft_monitor` (ja que els noms començats per `pg_` són reservats per PostgreSQL com a rols del sistema).
+
 ## [0.1.2] - 2026-11-11
 
 ### Added

@@ -74,7 +74,7 @@ function createDefaultConfig(): ServerMonitoringConfig {
           name: 'postgres-main',
           host: '127.0.0.1',
           port: 5432,
-          user: 'pg_monitor',
+          user: 'rawcraft_monitor',
           password: '',
           dbname: 'postgres',
           sslmode: 'disable',
@@ -317,7 +317,7 @@ export const ServerConfigYamlView: React.FC = () => {
     name: 'postgres-main',
     host: '127.0.0.1',
     port: 5432,
-    user: 'pg_monitor',
+    user: 'rawcraft_monitor',
     password: '',
     dbname: 'postgres',
     sslmode: 'disable',
@@ -1139,15 +1139,28 @@ export const ServerConfigYamlView: React.FC = () => {
                 </Box>
               </Box>
 
-              <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.5, mb: 1.5 }}>
+              <Box sx={{ display: 'grid', gridTemplateColumns: '1.2fr 1.2fr 1fr', gap: 1.5, mb: 1.5 }}>
                 <Box>
                   <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: '#64748b', marginBottom: 4 }}>
-                    Usuari de monitorització (read-only)
+                    Usuari de monitorització
                   </label>
                   <input
                     type="text"
                     value={primaryPg.user}
                     onChange={(e) => updatePrimaryPg({ user: e.target.value })}
+                    style={{ width: '100%', padding: '8px 10px', fontSize: 13, border: '1px solid #e2e8f0', borderRadius: 6 }}
+                  />
+                </Box>
+                <Box>
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: '#64748b', marginBottom: 4 }}>
+                    Contrasenya (`password`)
+                  </label>
+                  <input
+                    type="password"
+                    value={primaryPg.password ?? ''}
+                    onChange={(e) => updatePrimaryPg({ password: e.target.value })}
+                    placeholder="Contrasenya de rawcraft_monitor"
+                    autoComplete="new-password"
                     style={{ width: '100%', padding: '8px 10px', fontSize: 13, border: '1px solid #e2e8f0', borderRadius: 6 }}
                   />
                 </Box>
