@@ -42,11 +42,13 @@ func checkSingleEndpointWithClient(ctx context.Context, client *http.Client, chk
 		expected = []int{200, 202}
 	}
 
+	checkedAt := time.Now().UTC()
 	snap := telemetry.HttpEndpointSnapshot{
 		Name:                chk.Name,
 		URL:                 chk.URL,
 		Method:              method,
 		ExpectedStatusCodes: expected,
+		LastCheckedAt:       &checkedAt,
 	}
 
 	start := time.Now()

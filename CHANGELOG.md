@@ -5,6 +5,29 @@ Tots els canvis rellevants d'aquest projecte es documenten en aquest fitxer.
 El format es basa en [Keep a Changelog](https://keepachangelog.com/ca/1.0.0/),
 i aquest projecte segueix [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.1] - 2026-11-11
+
+### Added
+- **Hora de la Darrera Petició als Endpoints & Timeline de Crides (OK / KO)**:
+  - Camp `last_checked_at` a `HttpEndpointSnapshot` ([`collector_http.go`](backend/internal/agent/collector_http.go), [`telemetry/model.go`](backend/internal/telemetry/model.go), OpenAPI i TypeScript) per registrar la marca de temps exacta de cada petició HTTP.
+  - Sèries `http_up` i `http_status` afegides a `TelemetryHistoryPoint` per permetre la traçabilitat històrica d'estat (UP/DOWN, codi HTTP i latència) de cada endpoint en el temps.
+  - Component `EndpointTimelineBar` a [`ServerDetailView.tsx`](frontend/src/modules/telemetry/views/ServerDetailView.tsx) que renderitza una barra interactiva amb les darreres comprovacions en segments de colors (verd per a OK, vermell per a KO), percentatge d'uptime i tooltips informatius amb data, hora, latència i estat HTTP.
+  - Nova columna a la taula d'endpoints amb l'hora exacta i temps relatiu de l'última petició.
+- **Gràfic de Desplegaments en el Rang Horari Seleccionat**:
+  - Nou component `DeploymentsTimelineChartCard` a [`ServerHistoryView.tsx`](frontend/src/modules/telemetry/views/ServerHistoryView.tsx) que renderitza un gràfic complet (amb el mateix format, dimensions i eixos temporals que els gràfics de CPU/RAM/Docker/Postgres) dedicat exclusivament als desplegaments de codi:
+    - Eix X amb escala temporal sincronitzada amb el rang triat (`6h`, `24h`, `7 dies`, `30 dies`, `365 dies`).
+    - Eix Y amb carrils horitzontals per producte/aplicació.
+    - Marcador interactiu rodó (verd per a èxit, vermell per a fallit) amb icona 🚀, etiqueta de versió, línia de guia vertical i tooltip detallat (producte, entorn, versió, commit, autor, hora i missatge).
+    - Desglossament independent dels gràfics de PostgreSQL i Endpoints HTTP a la vista d'històric per a una distribució neta en graella 2x3.
+- **Timestamp Visible a Totes les Comprovacions & Registre de Control de Servidor**:
+  - Indicador prominent de registre de control a la capçalera del servidor ([`ServerDetailView.tsx`](frontend/src/modules/telemetry/views/ServerDetailView.tsx)) amb punt d'estat verd/vermell, data, hora exacta i temps relatiu (`⏱️ Registre de control: HH:mm:ss (fa Xs)`).
+  - Marques de temps visibles a totes les pestanyes i components de monitoratge:
+    - Host / SO: hora i temps relatiu de la comprovació a la fitxa de resum.
+    - Contenidors Docker: marca de temps de la darrera comprovació de dimoni/contenidors.
+    - Endpoints HTTP: hora i temps relatiu de la darrera petició a la capçalera i a cada fila.
+    - PostgreSQL: marca de temps de la darrera inspecció d'instàncies i bases de dades `pg_database`.
+    - Llistat de servidors ([`ServersListView.tsx`](frontend/src/modules/servers/views/ServersListView.tsx)) i Dashboard ([`DashboardView.tsx`](frontend/src/modules/telemetry/views/DashboardView.tsx)): visualització de l'hora de l'últim registre de control per a cada servidor.
+
 ## [0.2.0] - 2026-11-11
 
 ### Added

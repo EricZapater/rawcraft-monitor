@@ -18,6 +18,23 @@ import type { Server } from '../api';
 import { useUsersStore } from '../../users/store';
 import { CopyApiKeyDialog } from '../components/CopyApiKeyDialog';
 
+function formatRelativeTime(dateStr?: string | null): string {
+  if (!dateStr) return 'mai';
+  try {
+    const diffMs = Date.now() - new Date(dateStr).getTime();
+    const diffSec = Math.floor(diffMs / 1000);
+    if (diffSec < 60) return `fa ${diffSec}s`;
+    const diffMin = Math.floor(diffSec / 60);
+    if (diffMin < 60) return `fa ${diffMin}m`;
+    const diffHours = Math.floor(diffMin / 60);
+    if (diffHours < 24) return `fa ${diffHours}h`;
+    const diffDays = Math.floor(diffHours / 24);
+    return `fa ${diffDays}d`;
+  } catch {
+    return dateStr;
+  }
+}
+
 export const ServersListView: React.FC = () => {
   const navigate = useNavigate();
   const {
@@ -380,6 +397,16 @@ sudo systemctl status rawcraft-agent`;
                           Check: {cfg?.check_interval_seconds ?? 15}s | Report:{' '}
                           {cfg?.report_interval_seconds ?? 300}s (
                           {Math.round((cfg?.report_interval_seconds ?? 300) / 60)}m)
+                        </Typography>
+                        <Typography
+                          sx={{
+                            fontFamily: '"Roboto Mono", monospace',
+                            fontSize: 11,
+                            color: srv.status === 'ONLINE' ? '#166534' : '#64748b',
+                            mt: 0.5,
+                          }}
+                        >
+                          ⏱️ Registre: {srv.last_seen_at ? `${new Date(srv.last_seen_at).toLocaleTimeString()} (${formatRelativeTime(srv.last_seen_at)})` : 'mai'}
                         </Typography>
                       </td>
                       <td style={{ padding: '16px 18px' }}>

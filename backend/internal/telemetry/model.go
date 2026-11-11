@@ -62,14 +62,15 @@ type DockerMetricsSnapshot struct {
 }
 
 type HttpEndpointSnapshot struct {
-	Name                string  `json:"name"`
-	URL                 string  `json:"url"`
-	Method              string  `json:"method"`
-	ExpectedStatusCodes []int   `json:"expected_status_codes"`
-	Up                  bool    `json:"up"`
-	StatusCode          int     `json:"status_code"`
-	ResponseTimeMs      int     `json:"response_time_ms"`
-	ErrorMessage        *string `json:"error_message,omitempty"`
+	Name                string     `json:"name"`
+	URL                 string     `json:"url"`
+	Method              string     `json:"method"`
+	ExpectedStatusCodes []int      `json:"expected_status_codes"`
+	Up                  bool       `json:"up"`
+	StatusCode          int        `json:"status_code"`
+	ResponseTimeMs      int        `json:"response_time_ms"`
+	ErrorMessage        *string    `json:"error_message,omitempty"`
+	LastCheckedAt       *time.Time `json:"last_checked_at,omitempty"`
 }
 
 type PostgresDatabaseInfo struct {
@@ -173,6 +174,8 @@ type TelemetryHistoryPoint struct {
 	ContainersCPU              map[string]float64 `json:"containers_cpu,omitempty"`
 	ContainersMemoryMB         map[string]float64 `json:"containers_memory_mb,omitempty"`
 	HttpLatencyMs              map[string]int     `json:"http_latency_ms,omitempty"`
+	HttpUp                     map[string]bool    `json:"http_up,omitempty"`
+	HttpStatus                 map[string]int     `json:"http_status,omitempty"`
 	PostgresConnectionsPercent map[string]float64 `json:"postgres_connections_percent,omitempty"`
 	PostgresSizeMB             map[string]float64 `json:"postgres_size_mb,omitempty"`
 }

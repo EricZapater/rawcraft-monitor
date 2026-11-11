@@ -19,11 +19,13 @@ import {
 import { useTelemetryStore } from '../store';
 import { serversApi, type Deployment } from '../../servers/api';
 import { CopyApiKeyDialog } from '../../servers/components/CopyApiKeyDialog';
-import type {
-  DockerContainerSnapshot,
-  HttpEndpointSnapshot,
-  PostgresDatabaseInfo,
-  PostgresInstanceSnapshot,
+import {
+  telemetryApi,
+  type DockerContainerSnapshot,
+  type HttpEndpointSnapshot,
+  type PostgresDatabaseInfo,
+  type PostgresInstanceSnapshot,
+  type TelemetryHistoryPoint,
 } from '../api';
 
 type DockerSortField = 'name' | 'cpu_percent' | 'memory_percent' | 'image_size_mb';
@@ -85,6 +87,103 @@ function formatRelativeTime(dateStr: string): string {
   }
 }
 
+interface EndpointTimelineCheck {
+  timestamp: string;
+  up: boolean;
+  statusCode: number;
+  latencyMs: number;
+}
+
+interface EndpointTimelineBarProps {
+  checks: EndpointTimelineCheck[];
+  currentUp: boolean;
+  currentStatus: number;
+  currentLatency: number;
+  currentTimestamp?: string | null;
+}
+
+const EndpointTimelineBar: React.FC<EndpointTimelineBarProps> = ({
+  checks,
+  currentUp,
+  currentStatus,
+  currentLatency,
+  currentTimestamp,
+}) => {
+  const allChecks = useMemo(() => {
+    const list = [...checks];
+    if (list.length === 0 && currentTimestamp) {
+      list.push({
+        timestamp: currentTimestamp,
+        up: currentUp,
+        statusCode: currentStatus,
+        latencyMs: currentLatency,
+      });
+    }
+    return list.slice(-25);
+  }, [checks, currentUp, currentStatus, currentLatency, currentTimestamp]);
+
+  const uptimePercent = useMemo(() => {
+    if (allChecks.length === 0) return currentUp ? 100 : 0;
+    const okCount = allChecks.filter((c) => c.up).length;
+    return Math.round((okCount / allChecks.length) * 100);
+  }, [allChecks, currentUp]);
+
+  return (
+    <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 1 }}>
+      <Box
+        sx={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '3px',
+          bgcolor: '#f1f5f9',
+          p: '4px 6px',
+          borderRadius: '6px',
+          border: '1px solid #e2e8f0',
+        }}
+      >
+        {allChecks.map((c, idx) => {
+          const isCurrent = idx === allChecks.length - 1;
+          const title = `🕒 ${new Date(c.timestamp).toLocaleTimeString()} (${formatRelativeTime(c.timestamp)})\nEstat: ${c.statusCode} ${c.up ? 'OK' : 'KO'}\nLatència: ${c.latencyMs}ms${isCurrent ? ' (Actual)' : ''}`;
+          return (
+            <Box
+              key={`${c.timestamp}-${idx}`}
+              title={title}
+              sx={{
+                width: 7,
+                height: 18,
+                borderRadius: '2px',
+                bgcolor: c.up ? '#16a34a' : '#dc2626',
+                cursor: 'pointer',
+                transition: 'transform 0.1s',
+                '&:hover': {
+                  transform: 'scaleY(1.25)',
+                  filter: 'brightness(1.15)',
+                },
+              }}
+            />
+          );
+        })}
+      </Box>
+
+      <Box
+        component="span"
+        sx={{
+          fontSize: 11,
+          fontWeight: 700,
+          fontFamily: '"Roboto Mono", monospace',
+          color: uptimePercent >= 99 ? '#16a34a' : uptimePercent >= 90 ? '#d97706' : '#dc2626',
+          bgcolor: uptimePercent >= 99 ? '#dcfce7' : uptimePercent >= 90 ? '#fef3c7' : '#fee2e2',
+          px: 0.8,
+          py: 0.2,
+          borderRadius: '4px',
+        }}
+      >
+        {uptimePercent}% OK
+      </Box>
+    </Box>
+  );
+};
+
 export const ServerDetailView: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const { liveDetail, loading, error, fetchLiveDetail, clearError } = useTelemetryStore();
@@ -115,6 +214,40 @@ export const ServerDetailView: React.FC = () => {
   const [actionsModalOpen, setActionsModalOpen] = useState<boolean>(false);
   const [copySnackbar, setCopySnackbar] = useState<boolean>(false);
   const [copyKeyOpen, setCopyKeyOpen] = useState<boolean>(false);
+  const [historyPoints, setHistoryPoints] = useState<TelemetryHistoryPoint[]>([]);
+
+  const fetchHistoryPoints = useCallback(async () => {
+    if (!id) return;
+    try {
+      const res = await telemetryApi.getServerTelemetryHistory(id, { range: '6h' });
+      if (res?.points) {
+        setHistoryPoints(res.points);
+      }
+    } catch {
+      // Ignorar error silenciós
+    }
+  }, [id]);
+
+  const endpointHistory = useMemo(() => {
+    const map: Record<string, EndpointTimelineCheck[]> = {};
+    for (const pt of historyPoints) {
+      if (pt.http_latency_ms) {
+        for (const epName of Object.keys(pt.http_latency_ms)) {
+          if (!map[epName]) map[epName] = [];
+          const isUp = pt.http_up ? (pt.http_up[epName] ?? true) : true;
+          const status = pt.http_status ? (pt.http_status[epName] ?? 200) : 200;
+          const lat = pt.http_latency_ms[epName] ?? 0;
+          map[epName].push({
+            timestamp: pt.timestamp,
+            up: isUp,
+            statusCode: status,
+            latencyMs: lat,
+          });
+        }
+      }
+    }
+    return map;
+  }, [historyPoints]);
 
   const fetchDeployments = useCallback(async () => {
     if (!id) return;
@@ -134,13 +267,15 @@ export const ServerDetailView: React.FC = () => {
     if (!id) return;
     void fetchLiveDetail(id);
     void fetchDeployments();
+    void fetchHistoryPoints();
 
     const timer = window.setInterval(() => {
       void fetchLiveDetail(id);
       void fetchDeployments();
+      void fetchHistoryPoints();
     }, 15000);
     return () => window.clearInterval(timer);
-  }, [id, fetchLiveDetail, fetchDeployments]);
+  }, [id, fetchLiveDetail, fetchDeployments, fetchHistoryPoints]);
 
   const sortedContainers: DockerContainerSnapshot[] = useMemo(() => {
     const list = [...(liveDetail?.docker?.containers ?? [])];
@@ -295,9 +430,35 @@ export const ServerDetailView: React.FC = () => {
         </Box>
 
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
-          <Typography sx={{ fontSize: 12, color: '#64748b' }}>
-            Actualitzat: {liveDetail?.recorded_at ? new Date(liveDetail.recorded_at).toLocaleTimeString() : 'N/A'}
-          </Typography>
+          <Box
+            sx={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 1,
+              px: 1.25,
+              py: 0.5,
+              bgcolor: '#f8fafc',
+              border: '1px solid #e2e8f0',
+              borderRadius: '8px',
+            }}
+          >
+            <Box
+              sx={{
+                width: 8,
+                height: 8,
+                borderRadius: '50%',
+                bgcolor: liveDetail?.status === 'ONLINE' ? '#16a34a' : '#dc2626',
+              }}
+            />
+            <Typography sx={{ fontSize: 12, color: '#1e293b', fontWeight: 600 }}>
+              ⏱️ Registre de control:
+            </Typography>
+            <Typography sx={{ fontSize: 12, color: '#475569', fontFamily: '"Roboto Mono", monospace' }}>
+              {liveDetail?.recorded_at
+                ? `${new Date(liveDetail.recorded_at).toLocaleTimeString()} (${formatRelativeTime(liveDetail.recorded_at)})`
+                : 'Pendent'}
+            </Typography>
+          </Box>
           <Button
             variant="outlined"
             size="small"
@@ -363,7 +524,11 @@ export const ServerDetailView: React.FC = () => {
             &nbsp;|&nbsp; <strong>RAM:</strong> {host ? `${Math.round(host.memory_percent)}%` : '—'}{' '}
             &nbsp;|&nbsp; <strong>Swap:</strong> {host ? `${Math.round(host.swap_percent)}%` : '—'}{' '}
             &nbsp;|&nbsp; <strong>Procs:</strong> {host?.processes_count ?? '—'} &nbsp;|&nbsp;{' '}
-            <strong>Users:</strong> {host?.users_logged_in ?? '—'}
+            <strong>Users:</strong> {host?.users_logged_in ?? '—'} &nbsp;|&nbsp;{' '}
+            <strong>Comprovat:</strong>{' '}
+            {liveDetail?.recorded_at
+              ? `${new Date(liveDetail.recorded_at).toLocaleTimeString()} (${formatRelativeTime(liveDetail.recorded_at)})`
+              : '—'}
           </Typography>
         </Box>
 
@@ -547,6 +712,9 @@ export const ServerDetailView: React.FC = () => {
                 {liveDetail?.docker?.stopped_host_containers ?? 0} aturats)
                 {typeof liveDetail?.docker?.total_images_size_mb === 'number' && (
                   <> • 📦 Espai imatges a disc: <strong>{formatBytesOrMB(liveDetail.docker.total_images_size_mb)}</strong></>
+                )}
+                {liveDetail?.recorded_at && (
+                  <> • 🕒 Comprovació: <strong>{new Date(liveDetail.recorded_at).toLocaleTimeString()} ({formatRelativeTime(liveDetail.recorded_at)})</strong></>
                 )}
               </Typography>
             </Box>
@@ -759,6 +927,9 @@ export const ServerDetailView: React.FC = () => {
               </Typography>
               <Typography sx={{ fontSize: 12, color: '#64748b', mt: 0.25 }}>
                 {httpEndpoints.filter((e) => e.up).length} operatius de {httpEndpoints.length} totals
+                {liveDetail?.recorded_at && (
+                  <> • 🕒 Última comprovació: <strong>{new Date(liveDetail.recorded_at).toLocaleTimeString()} ({formatRelativeTime(liveDetail.recorded_at)})</strong></>
+                )}
               </Typography>
             </Box>
           </Box>
@@ -769,7 +940,7 @@ export const ServerDetailView: React.FC = () => {
             aria-label="Taula d'endpoints HTTP d'aplicacions"
             sx={{ overflowX: 'auto', maxWidth: '100%' }}
           >
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: 13, minWidth: 600 }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: 13, minWidth: 800 }}>
               <thead style={{ position: 'sticky', top: 0, zIndex: 1 }}>
                 <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
                   <th style={{ padding: '11px 16px', fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase' }}>
@@ -782,17 +953,23 @@ export const ServerDetailView: React.FC = () => {
                     Esperat
                   </th>
                   <th style={{ padding: '11px 16px', fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase' }}>
-                    Rebut
+                    Estat Rebut
                   </th>
                   <th style={{ padding: '11px 16px', fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase' }}>
                     Latència
+                  </th>
+                  <th style={{ padding: '11px 16px', fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase' }}>
+                    Última Crida / Hora
+                  </th>
+                  <th style={{ padding: '11px 16px', fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase' }}>
+                    Timeline Crides (OK / KO)
                   </th>
                 </tr>
               </thead>
               <tbody>
                 {paginatedHttpEndpoints.length === 0 ? (
                   <tr>
-                    <td colSpan={5} style={{ padding: 24, textAlign: 'center', color: '#64748b' }}>
+                    <td colSpan={7} style={{ padding: 24, textAlign: 'center', color: '#64748b' }}>
                       Cap endpoint HTTP configurat en aquest servidor.
                     </td>
                   </tr>
@@ -827,6 +1004,31 @@ export const ServerDetailView: React.FC = () => {
                       </td>
                       <td style={{ padding: '12px 16px', fontFamily: '"Roboto Mono", monospace', fontSize: 12 }}>
                         {ep.response_time_ms} ms
+                      </td>
+                      <td style={{ padding: '12px 16px', fontFamily: '"Roboto Mono", monospace', fontSize: 12 }}>
+                        <Typography sx={{ fontSize: 12, fontWeight: 600, color: '#1e293b' }}>
+                          {ep.last_checked_at
+                            ? new Date(ep.last_checked_at).toLocaleTimeString()
+                            : liveDetail?.recorded_at
+                              ? new Date(liveDetail.recorded_at).toLocaleTimeString()
+                              : '—'}
+                        </Typography>
+                        <Typography sx={{ fontSize: 11, color: '#64748b' }}>
+                          {ep.last_checked_at
+                            ? formatRelativeTime(ep.last_checked_at)
+                            : liveDetail?.recorded_at
+                              ? formatRelativeTime(liveDetail.recorded_at)
+                              : ''}
+                        </Typography>
+                      </td>
+                      <td style={{ padding: '12px 16px' }}>
+                        <EndpointTimelineBar
+                          checks={endpointHistory[ep.name] || []}
+                          currentUp={ep.up}
+                          currentStatus={ep.status_code}
+                          currentLatency={ep.response_time_ms}
+                          currentTimestamp={ep.last_checked_at || liveDetail?.recorded_at}
+                        />
                       </td>
                     </tr>
                   ))
@@ -1021,6 +1223,9 @@ export const ServerDetailView: React.FC = () => {
                 <Typography sx={{ fontSize: 12, color: '#64748b', mt: 0.25 }}>
                   {allDatabases.length} bases de dades no-plantilla detectades • Mida acumulada:{' '}
                   {formatBytesOrMB(totalPostgresSizeMB)}
+                  {liveDetail?.recorded_at && (
+                    <> • 🕒 Comprovació: <strong>{new Date(liveDetail.recorded_at).toLocaleTimeString()} ({formatRelativeTime(liveDetail.recorded_at)})</strong></>
+                  )}
                 </Typography>
               </Box>
             </Box>

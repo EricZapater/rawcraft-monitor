@@ -465,7 +465,7 @@ export const DashboardView: React.FC = () => {
                   }}
                 >
                   <Box component="span">
-                    Últim report: {formatRelativeTime(srv.last_seen_at)} (cicle{' '}
+                    ⏱️ Últim registre: {srv.last_seen_at ? `${new Date(srv.last_seen_at).toLocaleTimeString()} (${formatRelativeTime(srv.last_seen_at)})` : 'mai'} (cicle{' '}
                     {Math.round((srv.report_interval_seconds ?? 300) / 60)}m)
                   </Box>
                   <Box sx={{ display: 'flex', gap: 2 }}>

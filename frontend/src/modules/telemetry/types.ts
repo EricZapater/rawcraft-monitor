@@ -185,6 +185,8 @@ export interface components {
             status_code: number;
             response_time_ms: number;
             error_message?: string | null;
+            /** Format: date-time */
+            last_checked_at?: string | null;
         };
         PostgresDatabaseInfo: {
             name: string;
@@ -208,6 +210,8 @@ export interface components {
             long_running_queries: number;
             locks_waiting: number;
             error_message?: string | null;
+            /** Format: date-time */
+            last_checked_at?: string | null;
         };
         TelemetryIngestRequest: {
             /** Format: uuid */
@@ -295,6 +299,12 @@ export interface components {
                 [key: string]: number;
             };
             http_latency_ms?: {
+                [key: string]: number;
+            };
+            http_up?: {
+                [key: string]: boolean;
+            };
+            http_status?: {
                 [key: string]: number;
             };
             postgres_connections_percent?: {

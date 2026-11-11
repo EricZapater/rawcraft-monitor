@@ -342,6 +342,266 @@ const MetricChartCard: React.FC<MetricChartCardProps> = ({
   );
 };
 
+interface DeploymentsTimelineChartCardProps {
+  points: TelemetryHistoryPoint[];
+  range: HistoryRange;
+  deployments: Deployment[];
+}
+
+const DeploymentsTimelineChartCard: React.FC<DeploymentsTimelineChartCardProps> = ({
+  points,
+  range,
+  deployments,
+}) => {
+  const width = 560;
+  const height = 190;
+  const margin = { top: 24, right: 20, bottom: 34, left: 65 };
+  const plotWidth = width - margin.left - margin.right;
+  const plotHeight = height - margin.top - margin.bottom;
+
+  const { startTime, endTime } = useMemo(() => {
+    if (points.length >= 2) {
+      const st = new Date(points[0].timestamp).getTime();
+      const et = new Date(points[points.length - 1].timestamp).getTime();
+      if (et > st) return { startTime: st, endTime: et };
+    }
+    const now = Date.now();
+    let ms = 24 * 3600 * 1000;
+    if (range === '6h') ms = 6 * 3600 * 1000;
+    else if (range === '7d') ms = 7 * 24 * 3600 * 1000;
+    else if (range === '30d') ms = 30 * 24 * 3600 * 1000;
+    else if (range === '365d') ms = 365 * 24 * 3600 * 1000;
+    return { startTime: now - ms, endTime: now };
+  }, [points, range]);
+
+  const activeDeployments = useMemo(() => {
+    return deployments
+      .filter((d) => {
+        const t = new Date(d.deployed_at).getTime();
+        return t >= startTime && t <= endTime;
+      })
+      .map((d) => {
+        const t = new Date(d.deployed_at).getTime();
+        const pct = Math.max(0, Math.min(1, (t - startTime) / (endTime - startTime)));
+        return {
+          ...d,
+          pct,
+          x: margin.left + Math.round(pct * plotWidth),
+        };
+      });
+  }, [deployments, startTime, endTime, plotWidth, margin.left]);
+
+  const products = useMemo(() => {
+    const list = Array.from(new Set(activeDeployments.map((d) => d.product_name))).filter(Boolean);
+    return list.length > 0 ? list : ['Desplegaments'];
+  }, [activeDeployments]);
+
+  const xTicks = useMemo(() => {
+    const ticksCount = 4;
+    const ticks: { x: number; label: string; textAnchor: 'start' | 'middle' | 'end' }[] = [];
+    for (let i = 0; i < ticksCount; i++) {
+      const pct = i / (ticksCount - 1);
+      const t = startTime + pct * (endTime - startTime);
+      const x = margin.left + Math.round(pct * plotWidth);
+      const d = new Date(t);
+      const textAnchor = i === 0 ? 'start' : i === ticksCount - 1 ? 'end' : 'middle';
+      ticks.push({
+        x,
+        label: formatTickDate(d, range),
+        textAnchor,
+      });
+    }
+    return ticks;
+  }, [startTime, endTime, margin.left, plotWidth, range]);
+
+  const successCount = activeDeployments.filter((d) => d.status === 'SUCCESS').length;
+  const failCount = activeDeployments.filter((d) => d.status !== 'SUCCESS').length;
+
+  return (
+    <Paper elevation={0} sx={{ border: '1px solid #e2e8f0', borderRadius: '10px', p: '16px 20px' }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5, flexWrap: 'wrap', gap: 1 }}>
+        <Typography sx={{ fontSize: 14, fontWeight: 700, color: '#1e293b' }}>
+          🚀 Desplegaments de Codi &amp; Versions ({range})
+        </Typography>
+        <Typography sx={{ fontSize: 12.5, color: '#64748b', fontFamily: '"Roboto Mono", monospace' }}>
+          {activeDeployments.length} desplegament(s) en aquest rang
+        </Typography>
+      </Box>
+
+      {/* Llegenda */}
+      <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 2, mb: 1.5, fontSize: 12 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+          <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: '#16a34a' }} />
+          <Typography sx={{ fontSize: 12, color: '#166534', fontWeight: 600 }}>
+            Exitós ({successCount})
+          </Typography>
+        </Box>
+        {failCount > 0 && (
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+            <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: '#dc2626' }} />
+            <Typography sx={{ fontSize: 12, color: '#991b1b', fontWeight: 600 }}>
+              Fallit ({failCount})
+            </Typography>
+          </Box>
+        )}
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+          <Box sx={{ width: 12, height: 2, borderBottom: '2px dashed #8b5cf6' }} />
+          <Typography sx={{ fontSize: 12, color: '#7c3aed', fontWeight: 500 }}>
+            Correlació temporal
+          </Typography>
+        </Box>
+      </Box>
+
+      {/* SVG Canvas */}
+      <svg
+        viewBox={`0 0 ${width} ${height}`}
+        style={{
+          width: '100%',
+          height: 'auto',
+          background: '#f8fafc',
+          borderRadius: 8,
+          border: '1px solid #e2e8f0',
+          display: 'block',
+        }}
+      >
+        {/* Línies de carril per producte a l'Eix Y */}
+        {products.map((prod, pIdx) => {
+          const laneY = margin.top + Math.round(((pIdx + 0.5) / products.length) * plotHeight);
+          return (
+            <g key={prod}>
+              <line
+                x1={margin.left}
+                y1={laneY}
+                x2={margin.left + plotWidth}
+                y2={laneY}
+                stroke="#e2e8f0"
+                strokeDasharray="3 3"
+                strokeWidth="1"
+              />
+              <text
+                x={margin.left - 8}
+                y={laneY + 3.5}
+                textAnchor="end"
+                fill="#475569"
+                fontSize="11"
+                fontWeight="600"
+                fontFamily='"Roboto Mono", monospace'
+              >
+                {prod.length > 10 ? `${prod.slice(0, 9)}…` : prod}
+              </text>
+            </g>
+          );
+        })}
+
+        {/* Estat buit si no hi ha desplegaments en el rang */}
+        {activeDeployments.length === 0 && (
+          <text
+            x={margin.left + plotWidth / 2}
+            y={margin.top + plotHeight / 2 + 4}
+            textAnchor="middle"
+            fill="#94a3b8"
+            fontSize="12"
+            fontStyle="italic"
+          >
+            Cap desplegament registrat en les hores seleccionades ({range})
+          </text>
+        )}
+
+        {/* Desplegaments plotejats a la seva coordenada temporal exacta */}
+        {activeDeployments.map((d) => {
+          const isSuccess = d.status === 'SUCCESS';
+          const pIdx = Math.max(0, products.indexOf(d.product_name));
+          const laneY = margin.top + Math.round(((pIdx + 0.5) / products.length) * plotHeight);
+          const color = isSuccess ? '#16a34a' : '#dc2626';
+
+          const tooltip = `🚀 Producte: ${d.product_name} (${d.environment})
+🏷️ Versió: ${d.version || (d.commit_sha ? d.commit_sha.slice(0, 7) : '—')}
+⚡ Estat: ${d.status}
+👤 Desplegat per: ${d.deployed_by || 'CI/CD'}
+🕒 Data i Hora: ${new Date(d.deployed_at).toLocaleString()} (${formatRelativeTime(d.deployed_at)})
+📝 Commit: ${d.commit_message || 'Sense missatge'}`;
+
+          return (
+            <g key={d.id} style={{ cursor: 'pointer' }}>
+              <title>{tooltip}</title>
+              {/* Línia vertical guia */}
+              <line
+                x1={d.x}
+                y1={margin.top}
+                x2={d.x}
+                y2={margin.top + plotHeight}
+                stroke="#8b5cf6"
+                strokeWidth="1.5"
+                strokeDasharray="3 3"
+                opacity="0.8"
+              />
+              {/* Etiqueta de versió */}
+              <text
+                x={d.x}
+                y={Math.max(margin.top - 6, laneY - 12)}
+                textAnchor="middle"
+                fontSize="10"
+                fontWeight="700"
+                fill={color}
+                fontFamily='"Roboto Mono", monospace'
+              >
+                {d.version || (d.commit_sha ? d.commit_sha.slice(0, 6) : 'deploy')}
+              </text>
+              {/* Marcador rodó */}
+              <circle
+                cx={d.x}
+                cy={laneY}
+                r="7.5"
+                fill={color}
+                stroke="#ffffff"
+                strokeWidth="2"
+              />
+              <circle
+                cx={d.x}
+                cy={laneY}
+                r="3"
+                fill="#ffffff"
+              />
+            </g>
+          );
+        })}
+
+        {/* Eix X: Línia base i etiquetes temporals */}
+        <line
+          x1={margin.left}
+          y1={margin.top + plotHeight}
+          x2={margin.left + plotWidth}
+          y2={margin.top + plotHeight}
+          stroke="#cbd5e1"
+          strokeWidth="1.5"
+        />
+        {xTicks.map((xt, idx) => (
+          <g key={idx}>
+            <line
+              x1={xt.x}
+              y1={margin.top + plotHeight}
+              x2={xt.x}
+              y2={margin.top + plotHeight + 5}
+              stroke="#94a3b8"
+              strokeWidth="1"
+            />
+            <text
+              x={xt.x}
+              y={margin.top + plotHeight + 18}
+              textAnchor={xt.textAnchor}
+              fill="#64748b"
+              fontSize="10"
+              fontFamily='"Roboto Mono", monospace'
+            >
+              {xt.label}
+            </text>
+          </g>
+        ))}
+      </svg>
+    </Paper>
+  );
+};
+
 export const ServerHistoryView: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const {
@@ -427,6 +687,12 @@ export const ServerHistoryView: React.FC = () => {
     const vals = p.postgres_connections_percent ? Object.values(p.postgres_connections_percent) : [];
     return vals.length > 0 ? vals[0] : 0;
   });
+
+  const pgSizeSeries = points.map((p) => {
+    const vals = p.postgres_size_mb ? Object.values(p.postgres_size_mb) : [];
+    return vals.reduce((acc, v) => acc + v, 0);
+  });
+  const maxPgSize = Math.max(100, ...pgSizeSeries);
 
   const httpLatencySeries = points.map((p) => {
     const vals = p.http_latency_ms ? Object.values(p.http_latency_ms) : [];
@@ -628,19 +894,41 @@ export const ServerHistoryView: React.FC = () => {
               })}
             />
 
-            {/* Gràfica 4: PostgreSQL & Latència Endpoints HTTP */}
+            {/* Gràfica 4: PostgreSQL (% Connexions & Mida MB) */}
             <MetricChartCard
-              title="PostgreSQL (% Connexions) & Latència HTTP (ms)"
+              title="PostgreSQL (% Connexions & Mida MB)"
               points={points}
               range={range}
-              yMax={Math.max(100, maxHttpLatency)}
-              yUnit="ms"
+              yMax={Math.max(100, maxPgSize)}
+              yUnit="MB"
               deployments={deployments}
-              currentSummary={`Conn: ${pgConnSeries.length > 0 ? Math.round(pgConnSeries[pgConnSeries.length - 1]) : 0}% • Latència: ${httpLatencySeries.length > 0 ? Math.round(httpLatencySeries[httpLatencySeries.length - 1]) : 0}ms`}
+              currentSummary={`Conn: ${pgConnSeries.length > 0 ? Math.round(pgConnSeries[pgConnSeries.length - 1]) : 0}% • Mida: ${pgSizeSeries.length > 0 ? Math.round(pgSizeSeries[pgSizeSeries.length - 1]) : 0}MB`}
               series={[
                 { name: 'PostgreSQL Connexions (%)', color: '#0f766e', values: pgConnSeries, strokeWidth: 2.5 },
-                { name: 'Latència Mitjana HTTP (ms)', color: '#2563eb', values: httpLatencySeries, strokeWidth: 2 },
+                { name: 'Mida Acumulada (MB)', color: '#0284c7', values: pgSizeSeries, strokeWidth: 2 },
               ]}
+            />
+
+            {/* Gràfica 5: Endpoints HTTP (Latència ms) */}
+            <MetricChartCard
+              title="Endpoints HTTP (Latència Mitjana ms)"
+              points={points}
+              range={range}
+              yMax={maxHttpLatency}
+              yUnit="ms"
+              deployments={deployments}
+              alertThreshold={{ value: 500, label: 'Límit 500ms' }}
+              currentSummary={`Latència actual: ${httpLatencySeries.length > 0 ? Math.round(httpLatencySeries[httpLatencySeries.length - 1]) : 0}ms`}
+              series={[
+                { name: 'Latència Mitjana HTTP (ms)', color: '#2563eb', values: httpLatencySeries, strokeWidth: 2.5 },
+              ]}
+            />
+
+            {/* Gràfica 6: Timeline de Desplegaments en el Rang (com un gràfic com els altres) */}
+            <DeploymentsTimelineChartCard
+              points={points}
+              range={range}
+              deployments={deployments}
             />
           </Box>
 

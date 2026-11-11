@@ -224,6 +224,10 @@ components:
         error_message:
           type: string
           nullable: true
+        last_checked_at:
+          type: string
+          format: date-time
+          nullable: true
 
     PostgresDatabaseInfo:
       type: object
@@ -281,6 +285,10 @@ components:
           type: integer
         error_message:
           type: string
+          nullable: true
+        last_checked_at:
+          type: string
+          format: date-time
           nullable: true
 
     TelemetryIngestRequest:
@@ -487,6 +495,14 @@ components:
             type: number
             format: double
         http_latency_ms:
+          type: object
+          additionalProperties:
+            type: integer
+        http_up:
+          type: object
+          additionalProperties:
+            type: boolean
+        http_status:
           type: object
           additionalProperties:
             type: integer

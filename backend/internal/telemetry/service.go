@@ -302,6 +302,8 @@ func (s *Service) GetServerHistory(
 			ContainersCPU:              map[string]float64{},
 			ContainersMemoryMB:         map[string]float64{},
 			HttpLatencyMs:              map[string]int{},
+			HttpUp:                     map[string]bool{},
+			HttpStatus:                 map[string]int{},
 			PostgresConnectionsPercent: map[string]float64{},
 			PostgresSizeMB:             map[string]float64{},
 		}
@@ -330,6 +332,8 @@ func (s *Service) GetServerHistory(
 		}
 		for _, ep := range rec.HttpEndpoints {
 			pt.HttpLatencyMs[ep.Name] = ep.ResponseTimeMs
+			pt.HttpUp[ep.Name] = ep.Up
+			pt.HttpStatus[ep.Name] = ep.StatusCode
 		}
 		for _, pg := range rec.PostgresInstances {
 			pt.PostgresConnectionsPercent[pg.Name] = pg.ConnectionsPercent
