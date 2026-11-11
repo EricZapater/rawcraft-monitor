@@ -1,0 +1,20 @@
+contracts/alert.openapi.yaml
+  h_42175f19913982 1-264
+contracts/server.openapi.yaml
+  h_42175f19913982 1-656
+contracts/telemetry.openapi.yaml
+  h_42175f19913982 1-677
+contracts/user.openapi.yaml
+  h_42175f19913982 1-418
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "2832e03cd008c4c1806e6ec0d60024bbe881b40e",
+  "prompts": {},
+  "humans": {
+    "h_42175f19913982": {
+      "author": "Èric Zapater <ericzm@ext.inditex.com>"
+    }
+  }
+}
