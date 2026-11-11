@@ -133,6 +133,7 @@ export const ServerConfigYamlView: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
   const [copiedYaml, setCopiedYaml] = useState(false);
+  const [copiedInstall, setCopiedInstall] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -1277,7 +1278,19 @@ export const ServerConfigYamlView: React.FC = () => {
                 Fitxer autogenerat per al servidor <strong>{serverName}</strong> (`HU-SRV-03`, `HU-INF-04`).
               </Typography>
             </Box>
-            <Box sx={{ display: 'flex', gap: 1.25 }}>
+            <Box sx={{ display: 'flex', gap: 1.25, flexWrap: 'wrap' }}>
+              <Button
+                variant="outlined"
+                onClick={async () => {
+                  if (yamlBundle?.install_commands) {
+                    await navigator.clipboard.writeText(yamlBundle.install_commands);
+                    setCopiedInstall(true);
+                  }
+                }}
+                sx={{ textTransform: 'none', borderColor: '#e2e8f0', color: '#1e293b' }}
+              >
+                {copiedInstall ? 'Comandes curl copiades!' : 'Copiar Comandes `curl`'}
+              </Button>
               <Button
                 variant="outlined"
                 onClick={async () => {
@@ -1289,6 +1302,14 @@ export const ServerConfigYamlView: React.FC = () => {
                 sx={{ textTransform: 'none', borderColor: '#e2e8f0', color: '#1e293b' }}
               >
                 {copiedYaml ? 'Copiat!' : 'Copiar `config.yaml`'}
+              </Button>
+              <Button
+                variant="outlined"
+                component="a"
+                href={`${import.meta.env.VITE_API_URL || '/api/v1'}/agent/binary`}
+                sx={{ textTransform: 'none', borderColor: '#1976d2', color: '#1976d2' }}
+              >
+                Descarregar Binari `rawcraft-agent`
               </Button>
               <Button
                 variant="contained"

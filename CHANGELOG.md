@@ -5,6 +5,15 @@ Tots els canvis rellevants d'aquest projecte es documenten en aquest fitxer.
 El format es basa en [Keep a Changelog](https://keepachangelog.com/ca/1.0.0/),
 i aquest projecte segueix [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.1] - 2026-11-11
+
+### Added
+- **Descàrrega directa via `curl` de l'Agent, `config.yaml` i unitat `systemd`**:
+  - `GET /api/v1/agent/binary`: Serveix directament el binari estàtic Linux `rawcraft-agent` des del Punt Central.
+  - `GET /api/v1/agent/config.yaml`: Serveix directament el fitxer `config.yaml` del servidor autenticat amb `-H "X-Agent-Key: <api_key>"` (o `?key=<api_key>`).
+  - `GET /api/v1/agent/systemd.service`: Serveix la unitat `/etc/systemd/system/rawcraft-agent.service` amb `GOMEMLIMIT=20MiB` i `MemoryMax=30M`.
+  - Actualitzat el generador de comandes d'instal·lació i la vista `ServerConfigYamlView` amb botó de copiat de comandes `curl` i descàrrega de binari.
+
 ## [0.1.0] - 2026-11-11
 
 ### Added

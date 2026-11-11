@@ -654,3 +654,64 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+
+  /agent/binary:
+    get:
+      operationId: downloadAgentBinary
+      summary: Descarrega el binari estàtic Linux de `rawcraft-agent` via curl o navegador (HU-INF-04)
+      tags: [servers]
+      responses:
+        '200':
+          description: Binari executable Linux (`rawcraft-agent`)
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '404':
+          description: Binari no trobat al servidor central
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /agent/config.yaml:
+    get:
+      operationId: downloadAgentConfigYamlByKey
+      summary: Descarrega directament el fitxer `config.yaml` del servidor autenticat amb `X-Agent-Key` (o `?key=`) via curl (HU-SRV-03, HU-INF-04)
+      tags: [servers]
+      parameters:
+        - name: key
+          in: query
+          required: false
+          description: API Key del servidor (alternativa a la capçalera `X-Agent-Key`)
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Contingut YAML del fitxer `config.yaml`
+          content:
+            text/yaml:
+              schema:
+                type: string
+        '401':
+          description: API Key invàlida o absent
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /agent/systemd.service:
+    get:
+      operationId: downloadAgentSystemdUnit
+      summary: Descarrega la unitat `rawcraft-agent.service` per a `systemd` via curl (HU-INF-04)
+      tags: [servers]
+      responses:
+        '200':
+          description: Contingut de la unitat `rawcraft-agent.service`
+          content:
+            text/plain:
+              schema:
+                type: string
+
+

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"os"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -20,6 +21,10 @@ func NewHandler(service *Service) *Handler {
 }
 
 func (h *Handler) RegisterRoutes(v1 *gin.RouterGroup) {
+	v1.GET("/agent/binary", h.DownloadAgentBinary)
+	v1.GET("/agent/config.yaml", h.DownloadAgentConfigYamlByKey)
+	v1.GET("/agent/systemd.service", h.DownloadAgentSystemdUnit)
+
 	srvGroup := v1.Group("/servers")
 	srvGroup.Use(shared.JWTAuthMiddleware())
 	{
@@ -196,4 +201,64 @@ func (h *Handler) GetConfigYaml(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, bundle)
+}
+
+func (h *Handler) DownloadAgentBinary(c *gin.Context) {
+	binPath := os.Getenv("AGENT_BINARY_PATH")
+	if binPath == "" {
+		binPath = "/app/rawcraft-agent"
+		if _, err := os.Stat(binPath); err != nil {
+			binPath = "./rawcraft-agent"
+		}
+	}
+
+	if _, err := os.Stat(binPath); err != nil {
+		shared.RespondError(c, http.StatusNotFound, "BINARY_NOT_FOUND", "El binari rawcraft-agent no està disponible en aquesta instància")
+		return
+	}
+
+	c.Header("Content-Description", "File Transfer")
+	c.Header("Content-Disposition", `attachment; filename="rawcraft-agent"`)
+	c.Header("Content-Type", "application/octet-stream")
+	c.File(binPath)
+}
+
+func (h *Handler) DownloadAgentConfigYamlByKey(c *gin.Context) {
+	rawKey := c.GetHeader("X-Agent-Key")
+	if rawKey == "" {
+		rawKey = c.Query("key")
+	}
+	if rawKey == "" {
+		shared.RespondError(c, http.StatusUnauthorized, "MISSING_AGENT_KEY", "Falta la capçalera X-Agent-Key o el paràmetre ?key=")
+		return
+	}
+
+	serverID, err := h.service.ValidateAgentKey(c.Request.Context(), rawKey)
+	if err != nil {
+		shared.RespondError(c, http.StatusUnauthorized, "INVALID_AGENT_KEY", "API Key d'agent invàlida o revocada")
+		return
+	}
+
+	scheme := "http"
+	if c.Request.TLS != nil || c.GetHeader("X-Forwarded-Proto") == "https" {
+		scheme = "https"
+	}
+	baseURL := ""
+	if c.Request.Host != "" {
+		baseURL = fmt.Sprintf("%s://%s", scheme, c.Request.Host)
+	}
+
+	bundle, err := h.service.GenerateYamlBundle(c.Request.Context(), serverID, baseURL)
+	if err != nil {
+		shared.RespondError(c, http.StatusInternalServerError, "INTERNAL_ERROR", "Error generant el fitxer config.yaml")
+		return
+	}
+
+	c.Header("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, bundle.Filename))
+	c.Data(http.StatusOK, "text/yaml; charset=utf-8", []byte(bundle.ConfigYaml))
+}
+
+func (h *Handler) DownloadAgentSystemdUnit(c *gin.Context) {
+	c.Header("Content-Disposition", `attachment; filename="rawcraft-agent.service"`)
+	c.Data(http.StatusOK, "text/plain; charset=utf-8", []byte(DefaultSystemdUnit()))
 }

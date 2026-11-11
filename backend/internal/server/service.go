@@ -212,7 +212,7 @@ func (s *Service) GenerateYamlBundle(ctx context.Context, serverID uuid.UUID, fa
 		if fallbackBaseURL != "" {
 			centralURL = fallbackBaseURL
 		} else {
-			centralURL = "https://monitor.rawcraft.local"
+			centralURL = "https://api.monitor.ericzapater.cat"
 		}
 	}
 	centralURL = strings.TrimRight(centralURL, "/")
@@ -245,7 +245,39 @@ func (s *Service) GenerateYamlBundle(ctx context.Context, serverID uuid.UUID, fa
 	)
 	configYaml := headerComment + string(yamlBytes)
 
-	systemdUnit := `[Unit]
+	systemdUnit := DefaultSystemdUnit()
+
+	slug := slugify(srv.Name)
+	filename := fmt.Sprintf("%s-config.yaml", slug)
+
+	installCommands := fmt.Sprintf(`# 1. Descarregar el binari estàtic de l'agent directament del Punt Central
+sudo curl -fsSL %s/api/v1/agent/binary -o /usr/local/bin/rawcraft-agent
+sudo chmod 0755 /usr/local/bin/rawcraft-agent
+
+# 2. Descarregar el config.yaml d'aquest servidor autenticat amb la seva API Key
+sudo mkdir -p /etc/rawcraft-agent
+sudo curl -fsSL -H "X-Agent-Key: %s" %s/api/v1/agent/config.yaml -o /etc/rawcraft-agent/config.yaml
+sudo chmod 0600 /etc/rawcraft-agent/config.yaml
+
+# 3. Descarregar la unitat systemd (amb límit GOMEMLIMIT=20MiB i MemoryMax=30M) i arrencar
+sudo curl -fsSL %s/api/v1/agent/systemd.service -o /etc/systemd/system/rawcraft-agent.service
+sudo systemctl daemon-reload
+sudo systemctl enable --now rawcraft-agent
+sudo systemctl status rawcraft-agent`, centralURL, srv.APIKeyPlain, centralURL, centralURL)
+
+	return &ServerYamlBundleResponse{
+		ServerID:        srv.ID,
+		ServerName:      srv.Name,
+		Filename:        filename,
+		ConfigYaml:      configYaml,
+		SystemdService:  systemdUnit,
+		InstallCommands: installCommands,
+	}, nil
+}
+
+// DefaultSystemdUnit retorna el contingut estàndard de `/etc/systemd/system/rawcraft-agent.service`.
+func DefaultSystemdUnit() string {
+	return `[Unit]
 Description=Rawcraft Monitor Lightweight Agent
 After=network-online.target docker.service
 Wants=network-online.target
@@ -265,26 +297,4 @@ StandardError=journal
 [Install]
 WantedBy=multi-user.target
 `
-
-	slug := slugify(srv.Name)
-	filename := fmt.Sprintf("%s-config.yaml", slug)
-
-	installCommands := fmt.Sprintf(`sudo mkdir -p /etc/rawcraft-agent
-sudo cp %s /etc/rawcraft-agent/config.yaml
-sudo chmod 0600 /etc/rawcraft-agent/config.yaml
-sudo cp rawcraft-agent /usr/local/bin/rawcraft-agent
-sudo chmod 0755 /usr/local/bin/rawcraft-agent
-sudo cp rawcraft-agent.service /etc/systemd/system/rawcraft-agent.service
-sudo systemctl daemon-reload
-sudo systemctl enable --now rawcraft-agent
-sudo systemctl status rawcraft-agent`, filename)
-
-	return &ServerYamlBundleResponse{
-		ServerID:        srv.ID,
-		ServerName:      srv.Name,
-		Filename:        filename,
-		ConfigYaml:      configYaml,
-		SystemdService:  systemdUnit,
-		InstallCommands: installCommands,
-	}, nil
 }
