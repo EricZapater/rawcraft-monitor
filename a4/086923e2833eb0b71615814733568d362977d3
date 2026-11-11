@@ -1,0 +1,84 @@
+.npmrc
+  h_42175f19913982 1-4
+frontend/index.html
+  h_42175f19913982 1-18
+frontend/package.json
+  h_42175f19913982 1-31
+frontend/src/App.tsx
+  h_42175f19913982 1-33
+frontend/src/api/client.ts
+  h_42175f19913982 1-37
+frontend/src/components/AppLayout.tsx
+  h_42175f19913982 1-378
+frontend/src/main.tsx
+  h_42175f19913982 1-11
+frontend/src/modules/alerts/api.ts
+  h_42175f19913982 1-22
+frontend/src/modules/alerts/store.ts
+  h_42175f19913982 1-68
+frontend/src/modules/alerts/types.ts
+  h_42175f19913982 1-227
+frontend/src/modules/alerts/views/AlertsView.tsx
+  h_42175f19913982 1-510
+frontend/src/modules/servers/api.ts
+  h_42175f19913982 1-57
+frontend/src/modules/servers/store.ts
+  h_42175f19913982 1-143
+frontend/src/modules/servers/types.ts
+  h_42175f19913982 1-552
+frontend/src/modules/servers/views/ServerConfigYamlView.tsx
+  h_42175f19913982 1-1408
+frontend/src/modules/servers/views/ServersListView.tsx
+  h_42175f19913982 1-650
+frontend/src/modules/telemetry/api.ts
+  h_42175f19913982 1-55
+frontend/src/modules/telemetry/store.ts
+  h_42175f19913982 1-116
+frontend/src/modules/telemetry/types.ts
+  h_42175f19913982 1-503
+frontend/src/modules/telemetry/views/DashboardView.tsx
+  h_42175f19913982 1-474
+frontend/src/modules/telemetry/views/ServerDetailView.tsx
+  h_42175f19913982 1-565
+frontend/src/modules/telemetry/views/ServerHistoryView.tsx
+  h_42175f19913982 1-485
+frontend/src/modules/users/api.ts
+  h_42175f19913982 1-57
+frontend/src/modules/users/store.ts
+  h_42175f19913982 1-210
+frontend/src/modules/users/types.ts
+  h_42175f19913982 1-532
+frontend/src/modules/users/views/LoginView.tsx
+  h_42175f19913982 1-250
+frontend/src/modules/users/views/UsersView.tsx
+  h_42175f19913982 1-614
+frontend/src/router/AppRouter.tsx
+  h_42175f19913982 1-64
+frontend/src/vite-env.d.ts
+  h_42175f19913982 1
+frontend/tsconfig.app.json
+  h_42175f19913982 1-22
+frontend/tsconfig.json
+  h_42175f19913982 1-7
+frontend/tsconfig.node.json
+  h_42175f19913982 1-20
+frontend/vite.config.ts
+  h_42175f19913982 1-25
+package.json
+  h_42175f19913982 1-9
+pnpm-lock.yaml
+  h_42175f19913982 1-2256
+pnpm-workspace.yaml
+  h_42175f19913982 1-2
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "a4086923e2833eb0b71615814733568d362977d3",
+  "prompts": {},
+  "humans": {
+    "h_42175f19913982": {
+      "author": "Èric Zapater <ericzm@ext.inditex.com>"
+    }
+  }
+}
