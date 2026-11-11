@@ -1,0 +1,30 @@
+CHANGELOG.md
+  h_42175f19913982 8-20
+VERSION
+  h_42175f19913982 1
+backend/internal/agent/collector_postgres.go
+  h_42175f19913982 91-131
+backend/internal/telemetry/model.go
+  h_42175f19913982 73-78,80-91
+contracts/telemetry.openapi.yaml
+  h_42175f19913982 222-236,266-271
+frontend/src/modules/alerts/types.ts
+  h_42175f19913982 58-74,244-283
+frontend/src/modules/telemetry/api.ts
+  h_42175f19913982 9
+frontend/src/modules/telemetry/types.ts
+  h_42175f19913982 185-191,202-203
+frontend/src/modules/telemetry/views/ServerDetailView.tsx
+  h_42175f19913982 10-12,15-20,22-63,69-85,99-141,144,147,149-151,153-154,156,159-162,175-190,215,221-222,277,304,310,312,315-318,320-334,337-416,418-424,427-448,450-509,511-530,532,534-541,543-584,586-604,613-631,633,641,661,664,668,705-719,721,723-726,730,733,737-747,749-751,756-760,763-765,767,769-775,778,782-808,813-817,820-857,860-863,865-914,917-1015,1017
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "d9b720ce48603d4568e5a51ebe1cbbbb6a2f449b",
+  "prompts": {},
+  "humans": {
+    "h_42175f19913982": {
+      "author": "Èric Zapater <ericzm@ext.inditex.com>"
+    }
+  }
+}
