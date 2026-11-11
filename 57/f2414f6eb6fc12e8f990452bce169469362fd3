@@ -1,0 +1,18 @@
+CHANGELOG.md
+  h_42175f19913982 8-12
+VERSION
+  h_42175f19913982 1
+frontend/src/modules/servers/views/ServerConfigYamlView.tsx
+  h_42175f19913982 77,320,1142,1145,1154-1166
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "57f2414f6eb6fc12e8f990452bce169469362fd3",
+  "prompts": {},
+  "humans": {
+    "h_42175f19913982": {
+      "author": "Èric Zapater <ericzm@ext.inditex.com>"
+    }
+  }
+}
