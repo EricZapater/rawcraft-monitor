@@ -1,0 +1,18 @@
+CHANGELOG.md
+  h_42175f19913982 8-20
+VERSION
+  h_42175f19913982 1
+frontend/src/modules/telemetry/views/ServerDetailView.tsx
+  h_42175f19913982 434,444,449-450,452-465
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "f9622e71ac6430a7de02eb8f34db5001624b6749",
+  "prompts": {},
+  "humans": {
+    "h_42175f19913982": {
+      "author": "Èric Zapater <ericzm@ext.inditex.com>"
+    }
+  }
+}
