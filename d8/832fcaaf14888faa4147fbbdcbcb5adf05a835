@@ -1,0 +1,38 @@
+CHANGELOG.md
+  h_42175f19913982 8-28
+VERSION
+  h_42175f19913982 1
+backend/internal/server/handler.go
+  h_42175f19913982 8-9,30-33,39,272-423
+backend/internal/server/model.go
+  h_42175f19913982 224-268
+backend/internal/server/repository.go
+  h_42175f19913982 272-349
+backend/internal/server/service.go
+  h_42175f19913982 8,302-350
+backend/migrations/000002_create_deployments.down.sql
+  h_42175f19913982 1-2
+backend/migrations/000002_create_deployments.up.sql
+  h_42175f19913982 1-22
+contracts/server.openapi.yaml
+  h_42175f19913982 433-542,827-923
+frontend/src/components/AppLayout.tsx
+  h_42175f19913982 7-8,24,101-175,178,185,190-191,194-207,220-221,225-271,281-283,286,296-298,310
+frontend/src/modules/servers/api.ts
+  h_42175f19913982 20-23,61-82
+frontend/src/modules/servers/types.ts
+  h_42175f19913982 129-163,363-406,763-864
+frontend/src/modules/telemetry/views/ServerDetailView.tsx
+  h_42175f19913982 1,13-17,20,71-86,109-130,134-135,138,141,210-238,269,274-275,280,290,295-297,319,325,329-330,335,344,372,380,388,394-396,402,405,419,426-427,429,441,448-449,451,463-464,470-471,473,483-504,558,659,742,1004,1120-1499
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "d8832fcaaf14888faa4147fbbdcbcb5adf05a835",
+  "prompts": {},
+  "humans": {
+    "h_42175f19913982": {
+      "author": "Èric Zapater <ericzm@ext.inditex.com>"
+    }
+  }
+}
