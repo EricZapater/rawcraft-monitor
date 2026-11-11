@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { useParams, Link as RouterLink } from 'react-router-dom';
 import {
   Box,
@@ -10,8 +10,14 @@ import {
   Tabs,
   Tab,
   TablePagination,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Snackbar,
 } from '@mui/material';
 import { useTelemetryStore } from '../store';
+import { serversApi, type Deployment } from '../../servers/api';
 import type {
   DockerContainerSnapshot,
   HttpEndpointSnapshot,
@@ -62,6 +68,22 @@ function formatBytesOrMB(mb: number): string {
   return `${mb.toFixed(2)} MB`;
 }
 
+function formatRelativeTime(dateStr: string): string {
+  try {
+    const diffMs = Date.now() - new Date(dateStr).getTime();
+    const diffSec = Math.floor(diffMs / 1000);
+    if (diffSec < 60) return `fa ${diffSec}s`;
+    const diffMin = Math.floor(diffSec / 60);
+    if (diffMin < 60) return `fa ${diffMin}m`;
+    const diffHours = Math.floor(diffMin / 60);
+    if (diffHours < 24) return `fa ${diffHours}h`;
+    const diffDays = Math.floor(diffHours / 24);
+    return `fa ${diffDays}d`;
+  } catch {
+    return dateStr;
+  }
+}
+
 export const ServerDetailView: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const { liveDetail, loading, error, fetchLiveDetail, clearError } = useTelemetryStore();
@@ -84,14 +106,39 @@ export const ServerDetailView: React.FC = () => {
   const [dbPage, setDbPage] = useState<number>(0);
   const [dbRowsPerPage, setDbRowsPerPage] = useState<number>(20);
 
+  // Desplegaments (Deploy Tracking)
+  const [deployments, setDeployments] = useState<Deployment[]>([]);
+  const [deploymentsTotal, setDeploymentsTotal] = useState<number>(0);
+  const [deployPage, setDeployPage] = useState<number>(0);
+  const [deployRowsPerPage, setDeployRowsPerPage] = useState<number>(20);
+  const [actionsModalOpen, setActionsModalOpen] = useState<boolean>(false);
+  const [copySnackbar, setCopySnackbar] = useState<boolean>(false);
+
+  const fetchDeployments = useCallback(async () => {
+    if (!id) return;
+    try {
+      const res = await serversApi.listServerDeployments(id, {
+        limit: deployRowsPerPage,
+        offset: deployPage * deployRowsPerPage,
+      });
+      setDeployments(res.items || []);
+      setDeploymentsTotal(res.total || 0);
+    } catch {
+      // Ignorar error silenciós per refrescos en segon pla
+    }
+  }, [id, deployPage, deployRowsPerPage]);
+
   useEffect(() => {
     if (!id) return;
     void fetchLiveDetail(id);
+    void fetchDeployments();
+
     const timer = window.setInterval(() => {
       void fetchLiveDetail(id);
+      void fetchDeployments();
     }, 15000);
     return () => window.clearInterval(timer);
-  }, [id, fetchLiveDetail]);
+  }, [id, fetchLiveDetail, fetchDeployments]);
 
   const sortedContainers: DockerContainerSnapshot[] = useMemo(() => {
     const list = [...(liveDetail?.docker?.containers ?? [])];
@@ -160,6 +207,35 @@ export const ServerDetailView: React.FC = () => {
     return pgInstances.reduce((acc, inst) => acc + (inst.database_size_mb || 0), 0);
   }, [pgInstances]);
 
+  const latestDeploy = deployments[0];
+
+  const githubActionsSnippet = useMemo(() => {
+    return `# .github/workflows/deploy.yml
+# Afegir aquest pas al final del teu job de desplegament a GitHub Actions
+
+- name: 🚀 Registrar Desplegament a RawCraft Monitor
+  if: always()
+  run: |
+    curl -fsSL -X POST https://api.monitor.ericzapater.cat/api/v1/deploys \\
+      -H "Content-Type: application/json" \\
+      -H "X-Agent-Key: \${{ secrets.RAWCRAFT_API_KEY }}" \\
+      -d '{
+        "product_name": "NOM_DEL_PRODUCTE",
+        "environment": "production",
+        "version": "'"\${{ github.ref_name }}"'",
+        "commit_sha": "'"\${{ github.sha }}"'",
+        "commit_message": '"\$(echo "\${{ github.event.head_commit.message }}" | jq -sR .)"',
+        "branch": "'"\${{ github.ref_name }}"'",
+        "deployed_by": "'"\${{ github.actor }}"'",
+        "status": "'"\${{ job.status == 'success' && 'SUCCESS' || 'FAILED' }}"'"
+      }'`;
+  }, []);
+
+  const handleCopySnippet = () => {
+    void navigator.clipboard.writeText(githubActionsSnippet);
+    setCopySnackbar(true);
+  };
+
   if (loading && !liveDetail) {
     return (
       <Box sx={{ py: 8, textAlign: 'center' }}>
@@ -190,18 +266,18 @@ export const ServerDetailView: React.FC = () => {
 
   return (
     <Box>
-      {/* Barra de navegació del detall */}
+      {/* Barra de navegació del detall - Responsive */}
       <Box
         sx={{
           display: 'flex',
           justifyContent: 'space-between',
-          alignItems: 'center',
+          alignItems: { xs: 'flex-start', sm: 'center' },
+          flexDirection: { xs: 'column', sm: 'row' },
           mb: 2.5,
-          flexWrap: 'wrap',
           gap: 1.5,
         }}
       >
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
           <Button
             component={RouterLink}
             to="/"
@@ -211,15 +287,14 @@ export const ServerDetailView: React.FC = () => {
           >
             ← Tornar al Dashboard
           </Button>
-          <Typography sx={{ fontSize: 15, fontWeight: 700, color: '#1e293b' }}>
+          <Typography sx={{ fontSize: { xs: 14, sm: 15 }, fontWeight: 700, color: '#1e293b' }}>
             Detall en viu: <code>{liveDetail?.server_name || id}</code>
           </Typography>
         </Box>
 
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-          <Typography sx={{ fontSize: 12.5, color: '#64748b' }}>
-            Informació actualitzada:{' '}
-            {liveDetail?.recorded_at ? new Date(liveDetail.recorded_at).toLocaleTimeString() : 'N/A'}
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
+          <Typography sx={{ fontSize: 12, color: '#64748b' }}>
+            Actualitzat: {liveDetail?.recorded_at ? new Date(liveDetail.recorded_at).toLocaleTimeString() : 'N/A'}
           </Typography>
           {id && (
             <Button
@@ -241,23 +316,23 @@ export const ServerDetailView: React.FC = () => {
         </Alert>
       )}
 
-      {/* Banner de Sistema Operatiu + Reboot Required */}
+      {/* Banner de Sistema Operatiu + Reboot Required - Responsive */}
       <Paper
         elevation={0}
         sx={{
           border: '1px solid #e2e8f0',
           borderRadius: '10px',
-          p: '16px 20px',
+          p: { xs: '14px 16px', sm: '16px 20px' },
           mb: 2.5,
           display: 'flex',
           justifyContent: 'space-between',
-          alignItems: 'center',
-          flexWrap: 'wrap',
+          alignItems: { xs: 'flex-start', sm: 'center' },
+          flexDirection: { xs: 'column', sm: 'row' },
           gap: 1.5,
         }}
       >
         <Box>
-          <Typography sx={{ fontSize: 18, fontWeight: 700, color: '#1e293b' }}>
+          <Typography sx={{ fontSize: { xs: 16, sm: 18 }, fontWeight: 700, color: '#1e293b' }}>
             {liveDetail?.server_name}{' '}
             <Box
               component="span"
@@ -266,7 +341,7 @@ export const ServerDetailView: React.FC = () => {
               ({host?.network_interface || 'eth0'}: {host?.ipv4_address || '—'})
             </Box>
           </Typography>
-          <Typography sx={{ fontSize: 13, color: '#64748b', mt: 0.5 }}>
+          <Typography sx={{ fontSize: { xs: 12, sm: 13 }, color: '#64748b', mt: 0.5, lineHeight: 1.6 }}>
             <strong>SO:</strong> {host?.os_name || '—'} &nbsp;|&nbsp;{' '}
             <strong>Kernel:</strong> {host?.kernel_version || '—'} ({host?.arch || 'amd64'}) &nbsp;|&nbsp;{' '}
             <strong>Load:</strong>{' '}
@@ -294,6 +369,7 @@ export const ServerDetailView: React.FC = () => {
               px: 1.25,
               py: 0.6,
               borderRadius: '6px',
+              whiteSpace: 'nowrap',
             }}
           >
             ⚠ Reboot required (`/var/run/reboot-required`)
@@ -301,7 +377,7 @@ export const ServerDetailView: React.FC = () => {
         )}
       </Paper>
 
-      {/* PESTANYES DE MONITORATGE */}
+      {/* PESTANYES DE MONITORATGE - Scrollable i tàctil per a mòbils */}
       <Paper
         elevation={0}
         sx={{
@@ -309,20 +385,24 @@ export const ServerDetailView: React.FC = () => {
           borderRadius: '10px',
           bgcolor: '#fff',
           mb: 2.5,
-          px: 1,
+          px: { xs: 0.5, sm: 1 },
         }}
       >
         <Tabs
           value={activeTab}
           onChange={(_e, val) => setActiveTab(val)}
+          variant="scrollable"
+          scrollButtons="auto"
+          allowScrollButtonsMobile
           aria-label="Pestanyes de recursos del servidor"
           sx={{
             '& .MuiTab-root': {
               textTransform: 'none',
               fontWeight: 600,
-              fontSize: 14,
+              fontSize: { xs: 13, sm: 14 },
               minHeight: 48,
               color: '#64748b',
+              whiteSpace: 'nowrap',
               '&.Mui-selected': {
                 color: '#1976d2',
               },
@@ -336,17 +416,17 @@ export const ServerDetailView: React.FC = () => {
         >
           <Tab
             label={
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
                 <span>🐳 Dockers</span>
                 <Box
                   component="span"
                   sx={{
                     bgcolor: activeTab === 0 ? '#dbeafe' : '#f1f5f9',
                     color: activeTab === 0 ? '#1e40af' : '#475569',
-                    px: 1,
-                    py: 0.2,
+                    px: 0.8,
+                    py: 0.15,
                     borderRadius: '10px',
-                    fontSize: 11.5,
+                    fontSize: 11,
                     fontWeight: 700,
                   }}
                 >
@@ -358,17 +438,17 @@ export const ServerDetailView: React.FC = () => {
           />
           <Tab
             label={
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
                 <span>🌐 Endpoints HTTP</span>
                 <Box
                   component="span"
                   sx={{
                     bgcolor: activeTab === 1 ? '#dbeafe' : '#f1f5f9',
                     color: activeTab === 1 ? '#1e40af' : '#475569',
-                    px: 1,
-                    py: 0.2,
+                    px: 0.8,
+                    py: 0.15,
                     borderRadius: '10px',
-                    fontSize: 11.5,
+                    fontSize: 11,
                     fontWeight: 700,
                   }}
                 >
@@ -380,17 +460,17 @@ export const ServerDetailView: React.FC = () => {
           />
           <Tab
             label={
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <span>🐘 Bases de Dades (PostgreSQL)</span>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                <span>🐘 Bases de Dades</span>
                 <Box
                   component="span"
                   sx={{
                     bgcolor: activeTab === 2 ? '#dbeafe' : '#f1f5f9',
                     color: activeTab === 2 ? '#1e40af' : '#475569',
-                    px: 1,
-                    py: 0.2,
+                    px: 0.8,
+                    py: 0.15,
                     borderRadius: '10px',
-                    fontSize: 11.5,
+                    fontSize: 11,
                     fontWeight: 700,
                   }}
                 >
@@ -399,6 +479,28 @@ export const ServerDetailView: React.FC = () => {
               </Box>
             }
             {...a11yProps(2)}
+          />
+          <Tab
+            label={
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                <span>🚀 Desplegaments</span>
+                <Box
+                  component="span"
+                  sx={{
+                    bgcolor: activeTab === 3 ? '#dbeafe' : '#f1f5f9',
+                    color: activeTab === 3 ? '#1e40af' : '#475569',
+                    px: 0.8,
+                    py: 0.15,
+                    borderRadius: '10px',
+                    fontSize: 11,
+                    fontWeight: 700,
+                  }}
+                >
+                  {deploymentsTotal}
+                </Box>
+              </Box>
+            }
+            {...a11yProps(3)}
           />
         </Tabs>
       </Paper>
@@ -453,7 +555,7 @@ export const ServerDetailView: React.FC = () => {
             aria-label="Taula de contenidors Docker amb CPU i RAM"
             sx={{ overflowX: 'auto', maxWidth: '100%' }}
           >
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: 13 }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: 13, minWidth: 650 }}>
               <thead style={{ position: 'sticky', top: 0, zIndex: 1 }}>
                 <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
                   <th
@@ -554,7 +656,7 @@ export const ServerDetailView: React.FC = () => {
                           <Box
                             component="span"
                             sx={{
-                              width: 110,
+                              width: 100,
                               height: 7,
                               bgcolor: '#e2e8f0',
                               borderRadius: '4px',
@@ -637,7 +739,7 @@ export const ServerDetailView: React.FC = () => {
             aria-label="Taula d'endpoints HTTP d'aplicacions"
             sx={{ overflowX: 'auto', maxWidth: '100%' }}
           >
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: 13 }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: 13, minWidth: 600 }}>
               <thead style={{ position: 'sticky', top: 0, zIndex: 1 }}>
                 <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
                   <th style={{ padding: '11px 16px', fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase' }}>
@@ -899,7 +1001,7 @@ export const ServerDetailView: React.FC = () => {
               aria-label="Taula de bases de dades PostgreSQL"
               sx={{ overflowX: 'auto', maxWidth: '100%' }}
             >
-              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: 13 }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: 13, minWidth: 600 }}>
                 <thead style={{ position: 'sticky', top: 0, zIndex: 1 }}>
                   <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
                     <th
@@ -1015,6 +1117,386 @@ export const ServerDetailView: React.FC = () => {
           </Paper>
         </Box>
       </TabPanel>
+
+      {/* PESTANYA 3: DESPLEGAMENTS (DEPLOY TRACKING) */}
+      <TabPanel value={activeTab} index={3}>
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
+          {/* BANNER D'INTEGRACIÓ I RESUM DE DEPLOYS */}
+          <Paper
+            elevation={0}
+            sx={{
+              border: '1px solid #e2e8f0',
+              borderRadius: '10px',
+              p: '16px 20px',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: { xs: 'flex-start', sm: 'center' },
+              flexDirection: { xs: 'column', sm: 'row' },
+              flexWrap: 'wrap',
+              gap: 2,
+            }}
+          >
+            <Box>
+              <Typography sx={{ fontWeight: 700, fontSize: 16, color: '#1e293b' }}>
+                Seguiment de Desplegaments (Deploy Tracking)
+              </Typography>
+              <Typography sx={{ fontSize: 13, color: '#64748b', mt: 0.5 }}>
+                {deploymentsTotal} desplegament(s) registrats
+                {latestDeploy && (
+                  <span>
+                    {' '}• Últim: <strong>{latestDeploy.product_name}</strong> (<code>{latestDeploy.version}</code>) {formatRelativeTime(latestDeploy.deployed_at)}
+                  </span>
+                )}
+              </Typography>
+            </Box>
+
+            <Button
+              variant="contained"
+              size="small"
+              onClick={() => setActionsModalOpen(true)}
+              sx={{
+                textTransform: 'none',
+                fontWeight: 600,
+                boxShadow: 'none',
+                bgcolor: '#1976d2',
+                '&:hover': { bgcolor: '#1565c0', boxShadow: 'none' },
+              }}
+            >
+              🛠️ Com integrar amb GitHub Actions
+            </Button>
+          </Paper>
+
+          {/* TAULA / TARGETES DE DESPLEGAMENTS */}
+          <Paper
+            elevation={0}
+            sx={{
+              border: '1px solid #e2e8f0',
+              borderRadius: '10px',
+              overflow: 'hidden',
+            }}
+          >
+            <Box
+              sx={{
+                p: '14px 20px',
+                borderBottom: '1px solid #e2e8f0',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                flexWrap: 'wrap',
+                gap: 1,
+              }}
+            >
+              <Typography sx={{ fontWeight: 700, fontSize: 15, color: '#1e293b' }}>
+                Historial de Canvis i Desplegaments
+              </Typography>
+            </Box>
+
+            {/* Vista Responsive: Targetes en Mòbil */}
+            <Box sx={{ display: { xs: 'flex', md: 'none' }, flexDirection: 'column', p: 1.5, gap: 1.5 }}>
+              {deployments.length === 0 ? (
+                <Box sx={{ p: 3, textAlign: 'center', color: '#64748b' }}>
+                  Cap desplegament registrat encara.
+                </Box>
+              ) : (
+                deployments.map((d) => {
+                  const isSuccess = d.status === 'SUCCESS';
+                  return (
+                    <Paper
+                      key={d.id}
+                      elevation={0}
+                      sx={{
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '8px',
+                        p: 1.75,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 1,
+                      }}
+                    >
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Box
+                            component="span"
+                            sx={{
+                              px: 1,
+                              py: 0.25,
+                              borderRadius: '6px',
+                              bgcolor: '#eff6ff',
+                              color: '#1d4ed8',
+                              fontWeight: 700,
+                              fontSize: 12,
+                            }}
+                          >
+                            {d.product_name}
+                          </Box>
+                          <Typography sx={{ fontFamily: '"Roboto Mono", monospace', fontSize: 12, fontWeight: 600 }}>
+                            {d.version}
+                          </Typography>
+                        </Box>
+                        <Box
+                          component="span"
+                          sx={{
+                            px: 1,
+                            py: 0.2,
+                            borderRadius: '12px',
+                            fontSize: 11,
+                            fontWeight: 700,
+                            bgcolor: isSuccess ? '#dcfce7' : '#fee2e2',
+                            color: isSuccess ? '#166534' : '#991b1b',
+                          }}
+                        >
+                          {d.status}
+                        </Box>
+                      </Box>
+
+                      {d.commit_message && (
+                        <Typography sx={{ fontSize: 12.5, color: '#334155' }}>
+                          {d.commit_message}
+                        </Typography>
+                      )}
+
+                      <Box
+                        sx={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          pt: 0.75,
+                          borderTop: '1px solid #f1f5f9',
+                          fontSize: 11.5,
+                          color: '#64748b',
+                        }}
+                      >
+                        <Box>
+                          {d.commit_sha && (
+                            <Box component="span" sx={{ fontFamily: '"Roboto Mono", monospace', mr: 1 }}>
+                              #{d.commit_sha.slice(0, 7)}
+                            </Box>
+                          )}
+                          {d.deployed_by && <span>per <strong>{d.deployed_by}</strong></span>}
+                        </Box>
+                        <Box>{formatRelativeTime(d.deployed_at)}</Box>
+                      </Box>
+                    </Paper>
+                  );
+                })
+              )}
+            </Box>
+
+            {/* Vista Desktop: Taula Completa */}
+            <Box
+              tabIndex={0}
+              role="region"
+              aria-label="Taula de desplegaments d'aplicacions"
+              sx={{ display: { xs: 'none', md: 'block' }, overflowX: 'auto', maxWidth: '100%' }}
+            >
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: 13 }}>
+                <thead style={{ position: 'sticky', top: 0, zIndex: 1 }}>
+                  <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+                    <th style={{ padding: '11px 16px', fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase' }}>
+                      Estat
+                    </th>
+                    <th style={{ padding: '11px 16px', fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase' }}>
+                      Producte
+                    </th>
+                    <th style={{ padding: '11px 16px', fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase' }}>
+                      Versió / Tag
+                    </th>
+                    <th style={{ padding: '11px 16px', fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase' }}>
+                      Commit &amp; Missatge
+                    </th>
+                    <th style={{ padding: '11px 16px', fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase' }}>
+                      Entorn
+                    </th>
+                    <th style={{ padding: '11px 16px', fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase' }}>
+                      Desplegat per
+                    </th>
+                    <th style={{ padding: '11px 16px', fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase' }}>
+                      Data &amp; Hora
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {deployments.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} style={{ padding: 28, textAlign: 'center', color: '#64748b' }}>
+                        Cap desplegament registrat encara. Utilitza GitHub Actions per començar a trackejar canvis!
+                      </td>
+                    </tr>
+                  ) : (
+                    deployments.map((d) => {
+                      const isSuccess = d.status === 'SUCCESS';
+                      return (
+                        <tr key={d.id} style={{ borderBottom: '1px solid #e2e8f0' }}>
+                          <td style={{ padding: '12px 16px' }}>
+                            <Box
+                              component="span"
+                              sx={{
+                                display: 'inline-block',
+                                px: 1,
+                                py: 0.3,
+                                borderRadius: '12px',
+                                fontSize: 11,
+                                fontWeight: 700,
+                                bgcolor: isSuccess ? '#dcfce7' : '#fee2e2',
+                                color: isSuccess ? '#166534' : '#991b1b',
+                              }}
+                            >
+                              {d.status}
+                            </Box>
+                          </td>
+                          <td style={{ padding: '12px 16px' }}>
+                            <Box
+                              component="span"
+                              sx={{
+                                px: 1,
+                                py: 0.25,
+                                borderRadius: '6px',
+                                bgcolor: '#eff6ff',
+                                color: '#1d4ed8',
+                                fontWeight: 700,
+                                fontSize: 12,
+                              }}
+                            >
+                              {d.product_name}
+                            </Box>
+                          </td>
+                          <td style={{ padding: '12px 16px', fontFamily: '"Roboto Mono", monospace', fontSize: 12, fontWeight: 600 }}>
+                            {d.version}
+                          </td>
+                          <td style={{ padding: '12px 16px', maxWidth: 320 }}>
+                            {d.commit_sha && (
+                              <Box
+                                component="span"
+                                sx={{
+                                  fontFamily: '"Roboto Mono", monospace',
+                                  fontSize: 11.5,
+                                  color: '#64748b',
+                                  mr: 1,
+                                }}
+                              >
+                                #{d.commit_sha.slice(0, 7)}
+                              </Box>
+                            )}
+                            <Typography
+                              component="span"
+                              sx={{ fontSize: 12.5, color: '#1e293b' }}
+                              noWrap
+                              title={d.commit_message || ''}
+                            >
+                              {d.commit_message || '—'}
+                            </Typography>
+                          </td>
+                          <td style={{ padding: '12px 16px', fontSize: 12, color: '#64748b' }}>
+                            {d.environment}
+                          </td>
+                          <td style={{ padding: '12px 16px', fontSize: 12 }}>
+                            {d.deployed_by || '—'}
+                          </td>
+                          <td style={{ padding: '12px 16px', fontSize: 12, color: '#64748b' }}>
+                            <Box component="span" sx={{ fontWeight: 600, color: '#1e293b' }}>
+                              {formatRelativeTime(d.deployed_at)}
+                            </Box>
+                            <Box sx={{ fontSize: 11 }}>
+                              {new Date(d.deployed_at).toLocaleString()}
+                            </Box>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </Box>
+
+            <TablePagination
+              component="div"
+              count={deploymentsTotal}
+              page={deployPage}
+              onPageChange={(_e, newPage) => setDeployPage(newPage)}
+              rowsPerPage={deployRowsPerPage}
+              onRowsPerPageChange={(e) => {
+                setDeployRowsPerPage(parseInt(e.target.value, 10));
+                setDeployPage(0);
+              }}
+              rowsPerPageOptions={[20, 50]}
+              labelRowsPerPage="Files per pàgina:"
+              labelDisplayedRows={({ from, to, count }) => `${from}–${to} de ${count}`}
+            />
+          </Paper>
+        </Box>
+      </TabPanel>
+
+      {/* MODAL: COM INTEGRAR AMB GITHUB ACTIONS */}
+      <Dialog
+        open={actionsModalOpen}
+        onClose={() => setActionsModalOpen(false)}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle sx={{ fontWeight: 700, fontSize: 18, borderBottom: '1px solid #e2e8f0' }}>
+          🚀 Com integrar el seguiment de Desplegaments amb GitHub Actions
+        </DialogTitle>
+        <DialogContent sx={{ pt: 2.5, display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <Typography sx={{ fontSize: 13.5, color: '#475569' }}>
+            Cada vegada que fas un deploy des d&apos;una GitHub Action (per exemple, construint contenidors o fent SSH al servidor), pots afegir aquest senzill pas al workflow per registrar el canvi a RawCraft Monitor:
+          </Typography>
+
+          <Box sx={{ bgcolor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', p: 2 }}>
+            <Typography sx={{ fontWeight: 700, fontSize: 13, mb: 1, color: '#1e293b' }}>
+              Pas 1: Configura el Secret al teu repositori de GitHub
+            </Typography>
+            <Typography sx={{ fontSize: 13, color: '#64748b' }}>
+              Ves a <strong>Settings → Secrets and variables → Actions</strong> i afegeix un nou secret anomenat <code>RAWCRAFT_API_KEY</code> amb l&apos;API Key d&apos;aquest servidor (o descarrega-la des d&apos;Inventari &amp; YAML).
+            </Typography>
+          </Box>
+
+          <Box sx={{ bgcolor: '#0f172a', borderRadius: '8px', p: 2, overflowX: 'auto', position: 'relative' }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+              <Typography sx={{ color: '#94a3b8', fontSize: 12, fontFamily: '"Roboto Mono", monospace' }}>
+                .github/workflows/deploy.yml
+              </Typography>
+              <Button
+                variant="outlined"
+                size="small"
+                onClick={handleCopySnippet}
+                sx={{
+                  color: '#38bdf8',
+                  borderColor: '#38bdf8',
+                  fontSize: 11,
+                  textTransform: 'none',
+                  py: 0.25,
+                }}
+              >
+                Copiar Codi
+              </Button>
+            </Box>
+            <pre style={{ margin: 0, color: '#f8fafc', fontFamily: '"Roboto Mono", monospace', fontSize: 12, lineHeight: 1.5 }}>
+              {githubActionsSnippet}
+            </pre>
+          </Box>
+
+          <Typography sx={{ fontSize: 12.5, color: '#64748b' }}>
+            💡 <strong>Nota:</strong> Reemplaça <code>NOM_DEL_PRODUCTE</code> pel nom de la teva aplicació (per exemple, <code>nasc-frontend</code>, <code>nasc-backend</code>, o el nom del contenidor Docker corresponent).
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ p: '14px 24px', borderTop: '1px solid #e2e8f0' }}>
+          <Button
+            variant="contained"
+            onClick={() => setActionsModalOpen(false)}
+            sx={{ textTransform: 'none', bgcolor: '#1976d2' }}
+          >
+            Tancar
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* SNACKBAR DE COPIAT */}
+      <Snackbar
+        open={copySnackbar}
+        autoHideDuration={3000}
+        onClose={() => setCopySnackbar(false)}
+        message="Snippet de GitHub Actions copiat al porta-retalls!"
+      />
     </Box>
   );
 };

@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"os"
 	"regexp"
@@ -297,4 +298,53 @@ StandardError=journal
 [Install]
 WantedBy=multi-user.target
 `
+}
+
+func (s *Service) RecordDeployment(ctx context.Context, serverID uuid.UUID, req CreateDeploymentRequest) (*Deployment, error) {
+	if strings.TrimSpace(req.ProductName) == "" {
+		return nil, errors.New("el camp 'product_name' és obligatori")
+	}
+	if strings.TrimSpace(req.Version) == "" {
+		return nil, errors.New("el camp 'version' és obligatori")
+	}
+
+	srv, err := s.repo.GetByID(ctx, serverID)
+	if err != nil {
+		return nil, err
+	}
+
+	depAt := time.Now()
+	if req.DeployedAt != nil && !req.DeployedAt.IsZero() {
+		depAt = *req.DeployedAt
+	}
+
+	dep := &Deployment{
+		ID:              uuid.New(),
+		ServerID:        serverID,
+		ServerName:      srv.Name,
+		ProductName:     strings.TrimSpace(req.ProductName),
+		Environment:     strings.TrimSpace(req.Environment),
+		Version:         strings.TrimSpace(req.Version),
+		CommitSHA:       req.CommitSHA,
+		CommitMessage:   req.CommitMessage,
+		Branch:          req.Branch,
+		DeployedBy:      req.DeployedBy,
+		Status:          req.Status,
+		DurationSeconds: req.DurationSeconds,
+		Details:         req.Details,
+		DeployedAt:      depAt,
+		CreatedAt:       time.Now(),
+	}
+
+	if err := s.repo.CreateDeployment(ctx, dep); err != nil {
+		return nil, err
+	}
+	return dep, nil
+}
+
+func (s *Service) ListDeployments(ctx context.Context, serverID uuid.UUID, limit, offset int) ([]Deployment, int, error) {
+	if _, err := s.repo.GetByID(ctx, serverID); err != nil {
+		return nil, 0, err
+	}
+	return s.repo.ListDeploymentsByServer(ctx, serverID, limit, offset)
 }

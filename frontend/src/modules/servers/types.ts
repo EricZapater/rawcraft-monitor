@@ -126,6 +126,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/servers/{id}/deploys": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Llista els desplegaments registrats per a un servidor */
+        get: operations["listServerDeployments"];
+        put?: never;
+        /** Registra un desplegament per al servidor indicat (suporta JWT o X-Agent-Key) */
+        post: operations["createServerDeployment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/deploys": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Registra un desplegament des de CI/CD (GitHub Actions) usant la clau X-Agent-Key */
+        post: operations["createDirectDeployment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -324,6 +359,50 @@ export interface components {
         ErrorResponse: {
             error: string;
             message: string;
+        };
+        /** @enum {string} */
+        DeploymentStatus: "SUCCESS" | "FAILED" | "IN_PROGRESS";
+        Deployment: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            server_id: string;
+            server_name?: string;
+            product_name: string;
+            /** @default production */
+            environment: string;
+            version: string;
+            commit_sha?: string | null;
+            commit_message?: string | null;
+            branch?: string | null;
+            deployed_by?: string | null;
+            status: components["schemas"]["DeploymentStatus"];
+            duration_seconds?: number | null;
+            details?: string | null;
+            /** Format: date-time */
+            deployed_at: string;
+            /** Format: date-time */
+            created_at: string;
+        };
+        CreateDeploymentRequest: {
+            product_name: string;
+            /** @default production */
+            environment: string;
+            version: string;
+            commit_sha?: string | null;
+            commit_message?: string | null;
+            branch?: string | null;
+            deployed_by?: string | null;
+            /** @default SUCCESS */
+            status: components["schemas"]["DeploymentStatus"];
+            duration_seconds?: number | null;
+            details?: string | null;
+            /** Format: date-time */
+            deployed_at?: string | null;
+        };
+        ListDeploymentsResponse: {
+            items: components["schemas"]["Deployment"][];
+            total: number;
         };
     };
     responses: never;
@@ -677,6 +756,108 @@ export interface operations {
                 };
                 content: {
                     "text/plain": string;
+                };
+            };
+        };
+    };
+    listServerDeployments: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Llistat de desplegaments */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListDeploymentsResponse"];
+                };
+            };
+            /** @description No autoritzat */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    createServerDeployment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateDeploymentRequest"];
+            };
+        };
+        responses: {
+            /** @description Desplegament registrat */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Deployment"];
+                };
+            };
+            /** @description Dades invàlides */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    createDirectDeployment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateDeploymentRequest"];
+            };
+        };
+        responses: {
+            /** @description Desplegament registrat */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Deployment"];
+                };
+            };
+            /** @description API Key invàlida o absent */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };

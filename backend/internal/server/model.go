@@ -221,3 +221,48 @@ type AgentYamlFile struct {
 	Postgres                   PostgresPillarConfig      `yaml:"postgres"`
 	SMTP                       shared.SMTPConfig         `yaml:"smtp"`
 }
+
+type DeploymentStatus string
+
+const (
+	DeploymentStatusSuccess    DeploymentStatus = "SUCCESS"
+	DeploymentStatusFailed     DeploymentStatus = "FAILED"
+	DeploymentStatusInProgress DeploymentStatus = "IN_PROGRESS"
+)
+
+type Deployment struct {
+	ID              uuid.UUID        `json:"id"`
+	ServerID        uuid.UUID        `json:"server_id"`
+	ServerName      string           `json:"server_name,omitempty"`
+	ProductName     string           `json:"product_name"`
+	Environment     string           `json:"environment"`
+	Version         string           `json:"version"`
+	CommitSHA       *string          `json:"commit_sha,omitempty"`
+	CommitMessage   *string          `json:"commit_message,omitempty"`
+	Branch          *string          `json:"branch,omitempty"`
+	DeployedBy      *string          `json:"deployed_by,omitempty"`
+	Status          DeploymentStatus `json:"status"`
+	DurationSeconds *int             `json:"duration_seconds,omitempty"`
+	Details         *string          `json:"details,omitempty"`
+	DeployedAt      time.Time        `json:"deployed_at"`
+	CreatedAt       time.Time        `json:"created_at"`
+}
+
+type CreateDeploymentRequest struct {
+	ProductName     string           `json:"product_name"`
+	Environment     string           `json:"environment"`
+	Version         string           `json:"version"`
+	CommitSHA       *string          `json:"commit_sha,omitempty"`
+	CommitMessage   *string          `json:"commit_message,omitempty"`
+	Branch          *string          `json:"branch,omitempty"`
+	DeployedBy      *string          `json:"deployed_by,omitempty"`
+	Status          DeploymentStatus `json:"status"`
+	DurationSeconds *int             `json:"duration_seconds,omitempty"`
+	Details         *string          `json:"details,omitempty"`
+	DeployedAt      *time.Time       `json:"deployed_at,omitempty"`
+}
+
+type ListDeploymentsResponse struct {
+	Items []Deployment `json:"items"`
+	Total int          `json:"total"`
+}

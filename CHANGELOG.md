@@ -5,6 +5,27 @@ Tots els canvis rellevants d'aquest projecte es documenten en aquest fitxer.
 El format es basa en [Keep a Changelog](https://keepachangelog.com/ca/1.0.0/),
 i aquest projecte segueix [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.8] - 2026-11-11
+
+### Added
+- **Seguiment de Desplegaments (Change & Deploy Tracking)**:
+  - Nova taula i migració `deployments` ([`000002_create_deployments.up.sql`](backend/migrations/000002_create_deployments.up.sql)) per registrar desplegaments associats a cada servidor.
+  - Nous endpoints a l'API:
+    - `POST /api/v1/deploys`: Endpoint ràpid per a CI/CD (GitHub Actions) autenticat amb `X-Agent-Key` (o `Authorization: Bearer <API-KEY>`) sense necessitat d'especificar l'UUID del servidor a la URL.
+    - `POST /api/v1/servers/:id/deploys`: Registre de desplegament amb validació de clau o sessió JWT.
+    - `GET /api/v1/servers/:id/deploys`: Llistat paginat de desplegaments d'un servidor.
+  - Contracte OpenAPI ([`server.openapi.yaml`](contracts/server.openapi.yaml)) i tipus TypeScript actualitzats.
+  - Nova pestanya **🚀 Desplegaments** a [`ServerDetailView.tsx`](frontend/src/modules/telemetry/views/ServerDetailView.tsx):
+    - Mostra el producte/aplicació desplegada, versió/tag, commit SHA i missatge, entorn, autor, estat (`SUCCESS`/`FAILED`) i data/hora exacta (amb indicació de temps relatiu "fa X minuts/hores").
+    - Paginació interactiva amb 20 o 50 registres per pàgina.
+    - Modal d'integració amb el bloc de codi Bash/curl preparat per copiar i enganxar directament a `.github/workflows/deploy.yml`.
+- **Disseny Totalment Responsive per a Mòbils**:
+  - A [`AppLayout.tsx`](frontend/src/components/AppLayout.tsx): afegit calaix de navegació mòbil (`Drawer`) amb botó d'hamburguesa per a pantalles petites (`< md`), ocultant la barra lateral estàtica i aprofitant el 100% de l'amplada de la pantalla.
+  - A [`ServerDetailView.tsx`](frontend/src/modules/telemetry/views/ServerDetailView.tsx):
+    - Pestanyes desplaçables horitzontalment amb suport tàctil (`Tabs variant="scrollable" scrollButtons="auto" allowScrollButtonsMobile`).
+    - Capçaleres i banners adaptatius (`flex-direction: column` a mòbil, `row` a escriptori).
+    - Vista dual a la llista de desplegaments: targetes netes i llegibles a mòbil (`xs/sm`) i taula completa a escriptori (`md+`).
+
 ## [0.1.7] - 2026-11-11
 
 ### Added

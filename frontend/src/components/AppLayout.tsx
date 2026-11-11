@@ -4,6 +4,8 @@ import {
   Box,
   Typography,
   Button,
+  IconButton,
+  Drawer,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -19,6 +21,7 @@ export const AppLayout: React.FC = () => {
   const { activeFiringCount, fetchAlerts } = useAlertsStore();
 
   const [pwdModalOpen, setPwdModalOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -95,91 +98,112 @@ export const AppLayout: React.FC = () => {
     fontWeight: isActive ? 600 : 500,
   });
 
+  const renderNavLinks = (onItemClick?: () => void) => (
+    <Box
+      component="nav"
+      aria-label="Navegació principal"
+      sx={{ p: '16px 12px', display: 'flex', flexDirection: 'column', gap: 0.5, flex: 1 }}
+    >
+      <NavLink to="/" end style={navItemStyle} onClick={onItemClick}>
+        <span>Dashboard Servidors</span>
+      </NavLink>
+
+      <NavLink to="/alerts" style={navItemStyle} onClick={onItemClick}>
+        <span>Alertes</span>
+        {activeFiringCount > 0 && (
+          <Box
+            component="span"
+            sx={{
+              bgcolor: '#fee2e2',
+              color: '#991b1b',
+              px: 1,
+              py: 0.2,
+              borderRadius: '12px',
+              fontSize: 11,
+              fontWeight: 700,
+            }}
+          >
+            {activeFiringCount}
+          </Box>
+        )}
+      </NavLink>
+
+      <NavLink to="/servers" style={navItemStyle} onClick={onItemClick}>
+        <span>Inventari &amp; YAML</span>
+      </NavLink>
+
+      {isAdmin && (
+        <NavLink to="/users" style={navItemStyle} onClick={onItemClick}>
+          <span>Usuaris i Permisos</span>
+        </NavLink>
+      )}
+    </Box>
+  );
+
+  const brandHeader = (
+    <Box
+      sx={{
+        height: 64,
+        display: 'flex',
+        alignItems: 'center',
+        px: 2.5,
+        gap: 1.25,
+        borderBottom: '1px solid #e2e8f0',
+        fontWeight: 700,
+        fontSize: 16,
+      }}
+    >
+      <Box
+        sx={{
+          width: 30,
+          height: 30,
+          borderRadius: '6px',
+          bgcolor: '#1976d2',
+          color: '#ffffff',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontFamily: '"Roboto Mono", monospace',
+          fontSize: 14,
+        }}
+      >
+        &gt;_
+      </Box>
+      <Box component="span">Rawcraft Monitor</Box>
+    </Box>
+  );
+
   return (
     <Box sx={{ minHeight: '100vh', display: 'flex', bgcolor: '#f1f5f9', color: '#1e293b' }}>
-      {/* Menú Lateral (Sidebar) */}
+      {/* Menú Lateral per Desktop (Sidebar) */}
       <Box
         component="aside"
         sx={{
           width: 240,
           bgcolor: '#ffffff',
           borderRight: '1px solid #e2e8f0',
-          display: 'flex',
+          display: { xs: 'none', md: 'flex' },
           flexDirection: 'column',
           flexShrink: 0,
         }}
       >
-        <Box
-          sx={{
-            height: 64,
-            display: 'flex',
-            alignItems: 'center',
-            px: 2.5,
-            gap: 1.25,
-            borderBottom: '1px solid #e2e8f0',
-            fontWeight: 700,
-            fontSize: 16,
-          }}
-        >
-          <Box
-            sx={{
-              width: 30,
-              height: 30,
-              borderRadius: '6px',
-              bgcolor: '#1976d2',
-              color: '#ffffff',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontFamily: '"Roboto Mono", monospace',
-              fontSize: 14,
-            }}
-          >
-            &gt;_
-          </Box>
-          <Box component="span">Rawcraft Monitor</Box>
-        </Box>
-
-        <Box
-          component="nav"
-          aria-label="Navegació principal"
-          sx={{ p: '16px 12px', display: 'flex', flexDirection: 'column', gap: 0.5, flex: 1 }}
-        >
-          <NavLink to="/" end style={navItemStyle}>
-            <span>Dashboard Servidors</span>
-          </NavLink>
-
-          <NavLink to="/alerts" style={navItemStyle}>
-            <span>Alertes</span>
-            {activeFiringCount > 0 && (
-              <Box
-                component="span"
-                sx={{
-                  bgcolor: '#fee2e2',
-                  color: '#991b1b',
-                  px: 1,
-                  py: 0.2,
-                  borderRadius: '12px',
-                  fontSize: 11,
-                  fontWeight: 700,
-                }}
-              >
-                {activeFiringCount}
-              </Box>
-            )}
-          </NavLink>
-
-          <NavLink to="/servers" style={navItemStyle}>
-            <span>Inventari &amp; YAML</span>
-          </NavLink>
-
-          {isAdmin && (
-            <NavLink to="/users" style={navItemStyle}>
-              <span>Usuaris i Permisos</span>
-            </NavLink>
-          )}
-        </Box>
+        {brandHeader}
+        {renderNavLinks()}
       </Box>
+
+      {/* Drawer per a Mòbil / Tablet */}
+      <Drawer
+        anchor="left"
+        open={mobileMenuOpen}
+        onClose={() => setMobileMenuOpen(false)}
+        sx={{ display: { xs: 'block', md: 'none' } }}
+        PaperProps={{
+          sx: { width: 260, bgcolor: '#ffffff' },
+        }}
+      >
+        {brandHeader}
+        {renderNavLinks(() => setMobileMenuOpen(false))}
+      </Drawer>
 
       {/* Contenidor Principal */}
       <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
@@ -193,17 +217,58 @@ export const AppLayout: React.FC = () => {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            px: 4,
-            gap: 2,
+            px: { xs: 2, sm: 3, md: 4 },
+            gap: 1.5,
           }}
         >
-          <Typography sx={{ fontSize: 13, color: '#64748b' }}>
-            Punt Central de Telemetria, Generador `config.yaml` i Alertes
-          </Typography>
-
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-            <Typography sx={{ fontSize: 14, fontWeight: 600, color: '#1e293b' }}>
-              {currentUser?.name || currentUser?.email} ({currentUser?.role || 'USER'})
+            <IconButton
+              onClick={() => setMobileMenuOpen(true)}
+              aria-label="Obrir menú de navegació"
+              sx={{ display: { xs: 'inline-flex', md: 'none' }, color: '#1e293b' }}
+              size="small"
+            >
+              ☰
+            </IconButton>
+
+            <Box sx={{ display: { xs: 'flex', md: 'none' }, alignItems: 'center', gap: 1 }}>
+              <Box
+                sx={{
+                  width: 26,
+                  height: 26,
+                  borderRadius: '6px',
+                  bgcolor: '#1976d2',
+                  color: '#ffffff',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontFamily: '"Roboto Mono", monospace',
+                  fontSize: 12,
+                  fontWeight: 700,
+                }}
+              >
+                &gt;_
+              </Box>
+              <Typography sx={{ fontWeight: 700, fontSize: 15, color: '#1e293b' }}>
+                Rawcraft
+              </Typography>
+            </Box>
+
+            <Typography sx={{ fontSize: 13, color: '#64748b', display: { xs: 'none', md: 'block' } }}>
+              Punt Central de Telemetria, Generador `config.yaml` i Alertes
+            </Typography>
+          </Box>
+
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Typography
+              sx={{
+                fontSize: 13,
+                fontWeight: 600,
+                color: '#1e293b',
+                display: { xs: 'none', sm: 'block' },
+              }}
+            >
+              {currentUser?.name || currentUser?.email}
             </Typography>
             <Button
               variant="outlined"
@@ -213,10 +278,12 @@ export const AppLayout: React.FC = () => {
                 textTransform: 'none',
                 borderColor: '#e2e8f0',
                 color: '#1e293b',
-                fontSize: 12.5,
+                fontSize: 12,
+                px: { xs: 1, sm: 1.5 },
+                minWidth: 'auto',
               }}
             >
-              Contrasenya (`HU-USR-04`)
+              Contrasenya
             </Button>
             <Button
               variant="outlined"
@@ -226,7 +293,9 @@ export const AppLayout: React.FC = () => {
                 textTransform: 'none',
                 borderColor: '#e2e8f0',
                 color: '#64748b',
-                fontSize: 12.5,
+                fontSize: 12,
+                px: { xs: 1, sm: 1.5 },
+                minWidth: 'auto',
               }}
             >
               Sortir
@@ -238,7 +307,7 @@ export const AppLayout: React.FC = () => {
         <Box
           component="main"
           sx={{
-            p: { xs: 2.5, md: '28px 32px' },
+            p: { xs: 1.5, sm: 2.5, md: '28px 32px' },
             maxWidth: 1280,
             width: '100%',
           }}

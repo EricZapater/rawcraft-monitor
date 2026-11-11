@@ -269,3 +269,81 @@ func (r *Repository) SoftDelete(ctx context.Context, id uuid.UUID) error {
 	}
 	return nil
 }
+
+func (r *Repository) CreateDeployment(ctx context.Context, d *Deployment) error {
+	if d.ID == uuid.Nil {
+		d.ID = uuid.New()
+	}
+	if d.Environment == "" {
+		d.Environment = "production"
+	}
+	if d.Status == "" {
+		d.Status = DeploymentStatusSuccess
+	}
+	now := time.Now()
+	if d.DeployedAt.IsZero() {
+		d.DeployedAt = now
+	}
+	if d.CreatedAt.IsZero() {
+		d.CreatedAt = now
+	}
+
+	_, err := r.pool.Exec(ctx, `
+		INSERT INTO deployments (
+			id, server_id, product_name, environment, version,
+			commit_sha, commit_message, branch, deployed_by,
+			status, duration_seconds, details, deployed_at, created_at
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+	`, d.ID, d.ServerID, d.ProductName, d.Environment, d.Version,
+		d.CommitSHA, d.CommitMessage, d.Branch, d.DeployedBy,
+		d.Status, d.DurationSeconds, d.Details, d.DeployedAt, d.CreatedAt)
+	return err
+}
+
+func (r *Repository) ListDeploymentsByServer(ctx context.Context, serverID uuid.UUID, limit, offset int) ([]Deployment, int, error) {
+	if limit <= 0 {
+		limit = 20
+	}
+	if limit > 100 {
+		limit = 100
+	}
+	if offset < 0 {
+		offset = 0
+	}
+
+	var total int
+	err := r.pool.QueryRow(ctx, `SELECT COUNT(*) FROM deployments WHERE server_id = $1`, serverID).Scan(&total)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	rows, err := r.pool.Query(ctx, `
+		SELECT 
+			d.id, d.server_id, s.name as server_name, d.product_name, d.environment,
+			d.version, d.commit_sha, d.commit_message, d.branch, d.deployed_by,
+			d.status, d.duration_seconds, d.details, d.deployed_at, d.created_at
+		FROM deployments d
+		JOIN servers s ON s.id = d.server_id
+		WHERE d.server_id = $1
+		ORDER BY d.deployed_at DESC
+		LIMIT $2 OFFSET $3
+	`, serverID, limit, offset)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	items := make([]Deployment, 0)
+	for rows.Next() {
+		var d Deployment
+		if err := rows.Scan(
+			&d.ID, &d.ServerID, &d.ServerName, &d.ProductName, &d.Environment,
+			&d.Version, &d.CommitSHA, &d.CommitMessage, &d.Branch, &d.DeployedBy,
+			&d.Status, &d.DurationSeconds, &d.Details, &d.DeployedAt, &d.CreatedAt,
+		); err != nil {
+			return nil, 0, err
+		}
+		items = append(items, d)
+	}
+	return items, total, nil
+}

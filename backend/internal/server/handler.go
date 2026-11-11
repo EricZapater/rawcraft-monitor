@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -25,11 +27,16 @@ func (h *Handler) RegisterRoutes(v1 *gin.RouterGroup) {
 	v1.GET("/agent/config.yaml", h.DownloadAgentConfigYamlByKey)
 	v1.GET("/agent/systemd.service", h.DownloadAgentSystemdUnit)
 
+	// Ingesta de Desplegaments (Deploy Tracking)
+	v1.POST("/servers/:id/deploys", h.CreateServerDeployment)
+	v1.POST("/deploys", h.CreateDirectDeployment)
+
 	srvGroup := v1.Group("/servers")
 	srvGroup.Use(shared.JWTAuthMiddleware())
 	{
 		srvGroup.GET("", h.ListServers)
 		srvGroup.GET("/:id", h.GetServerByID)
+		srvGroup.GET("/:id/deploys", h.ListServerDeployments)
 
 		// Rutes d'administració (només ADMIN)
 		adminOnly := srvGroup.Group("")
@@ -261,4 +268,156 @@ func (h *Handler) DownloadAgentConfigYamlByKey(c *gin.Context) {
 func (h *Handler) DownloadAgentSystemdUnit(c *gin.Context) {
 	c.Header("Content-Disposition", `attachment; filename="rawcraft-agent.service"`)
 	c.Data(http.StatusOK, "text/plain; charset=utf-8", []byte(DefaultSystemdUnit()))
+}
+
+func (h *Handler) CreateServerDeployment(c *gin.Context) {
+	idStr := c.Param("id")
+	serverID, err := uuid.Parse(idStr)
+	if err != nil {
+		shared.RespondError(c, http.StatusBadRequest, "INVALID_SERVER_ID", "ID de servidor invàlid")
+		return
+	}
+
+	agentKey := strings.TrimSpace(c.GetHeader("X-Agent-Key"))
+	if agentKey == "" {
+		authHeader := c.GetHeader("Authorization")
+		if strings.HasPrefix(authHeader, "Bearer ") {
+			agentKey = strings.TrimSpace(strings.TrimPrefix(authHeader, "Bearer "))
+		}
+	}
+
+	if agentKey != "" {
+		keyServerID, err := h.service.ValidateAgentKey(c.Request.Context(), agentKey)
+		if err != nil {
+			token, jwtErr := shared.ParseToken(agentKey)
+			if jwtErr == nil && token != nil {
+				_, allowed, authErr := h.service.GetAuthorizedByID(c.Request.Context(), token.UserID, string(token.Role), serverID)
+				if authErr != nil || !allowed {
+					shared.RespondError(c, http.StatusForbidden, "FORBIDDEN", "No tens permisos sobre aquest servidor")
+					return
+				}
+			} else {
+				shared.RespondError(c, http.StatusUnauthorized, "INVALID_KEY", "API Key d'agent o Token invàlid")
+				return
+			}
+		} else if keyServerID != serverID {
+			shared.RespondError(c, http.StatusForbidden, "FORBIDDEN", "La clau d'agent no correspon a aquest servidor")
+			return
+		}
+	} else {
+		cookie, err := c.Cookie("rawcraft_token")
+		if err != nil {
+			shared.RespondError(c, http.StatusUnauthorized, "UNAUTHORIZED", "Cal autenticació (X-Agent-Key o JWT)")
+			return
+		}
+		token, jwtErr := shared.ParseToken(cookie)
+		if jwtErr != nil || token == nil {
+			shared.RespondError(c, http.StatusUnauthorized, "UNAUTHORIZED", "Sessió invàlida")
+			return
+		}
+		_, allowed, authErr := h.service.GetAuthorizedByID(c.Request.Context(), token.UserID, string(token.Role), serverID)
+		if authErr != nil || !allowed {
+			shared.RespondError(c, http.StatusForbidden, "FORBIDDEN", "No tens permisos sobre aquest servidor")
+			return
+		}
+	}
+
+	var req CreateDeploymentRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		shared.RespondError(c, http.StatusBadRequest, "INVALID_PAYLOAD", "Format de petició invàlid")
+		return
+	}
+
+	dep, err := h.service.RecordDeployment(c.Request.Context(), serverID, req)
+	if err != nil {
+		shared.RespondError(c, http.StatusBadRequest, "DEPLOY_ERROR", err.Error())
+		return
+	}
+
+	c.JSON(http.StatusCreated, dep)
+}
+
+func (h *Handler) CreateDirectDeployment(c *gin.Context) {
+	agentKey := strings.TrimSpace(c.GetHeader("X-Agent-Key"))
+	if agentKey == "" {
+		authHeader := c.GetHeader("Authorization")
+		if strings.HasPrefix(authHeader, "Bearer ") {
+			agentKey = strings.TrimSpace(strings.TrimPrefix(authHeader, "Bearer "))
+		}
+	}
+
+	if agentKey == "" {
+		shared.RespondError(c, http.StatusUnauthorized, "MISSING_KEY", "Falta la capçalera X-Agent-Key o Authorization: Bearer <API-KEY>")
+		return
+	}
+
+	serverID, err := h.service.ValidateAgentKey(c.Request.Context(), agentKey)
+	if err != nil {
+		shared.RespondError(c, http.StatusUnauthorized, "INVALID_KEY", "API Key d'agent invàlida o revocada")
+		return
+	}
+
+	var req CreateDeploymentRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		shared.RespondError(c, http.StatusBadRequest, "INVALID_PAYLOAD", "Format de petició invàlid")
+		return
+	}
+
+	dep, err := h.service.RecordDeployment(c.Request.Context(), serverID, req)
+	if err != nil {
+		shared.RespondError(c, http.StatusBadRequest, "DEPLOY_ERROR", err.Error())
+		return
+	}
+
+	c.JSON(http.StatusCreated, dep)
+}
+
+func (h *Handler) ListServerDeployments(c *gin.Context) {
+	idStr := c.Param("id")
+	serverID, err := uuid.Parse(idStr)
+	if err != nil {
+		shared.RespondError(c, http.StatusBadRequest, "INVALID_SERVER_ID", "ID de servidor invàlid")
+		return
+	}
+
+	userID, _ := shared.GetAuthUserID(c)
+	role := shared.GetAuthUserRole(c)
+
+	_, allowed, err := h.service.GetAuthorizedByID(c.Request.Context(), userID, role, serverID)
+	if err != nil {
+		if errors.Is(err, ErrServerNotFound) {
+			shared.RespondError(c, http.StatusNotFound, "SERVER_NOT_FOUND", "Servidor no trobat")
+			return
+		}
+		shared.RespondError(c, http.StatusInternalServerError, "INTERNAL_ERROR", "Error consultant permisos")
+		return
+	}
+	if !allowed {
+		shared.RespondError(c, http.StatusForbidden, "FORBIDDEN", "No tens permisos per veure aquest servidor")
+		return
+	}
+
+	limit := 20
+	if l := c.Query("limit"); l != "" {
+		if val, err := strconv.Atoi(l); err == nil && val > 0 {
+			limit = val
+		}
+	}
+	offset := 0
+	if o := c.Query("offset"); o != "" {
+		if val, err := strconv.Atoi(o); err == nil && val >= 0 {
+			offset = val
+		}
+	}
+
+	items, total, err := h.service.ListDeployments(c.Request.Context(), serverID, limit, offset)
+	if err != nil {
+		shared.RespondError(c, http.StatusInternalServerError, "INTERNAL_ERROR", "Error recuperant els desplegaments")
+		return
+	}
+
+	c.JSON(http.StatusOK, ListDeploymentsResponse{
+		Items: items,
+		Total: total,
+	})
 }

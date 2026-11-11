@@ -430,6 +430,116 @@ components:
         message:
           type: string
 
+    DeploymentStatus:
+      type: string
+      enum: [SUCCESS, FAILED, IN_PROGRESS]
+
+    Deployment:
+      type: object
+      required:
+        - id
+        - server_id
+        - product_name
+        - environment
+        - version
+        - status
+        - deployed_at
+        - created_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        server_id:
+          type: string
+          format: uuid
+        server_name:
+          type: string
+        product_name:
+          type: string
+        environment:
+          type: string
+          default: production
+        version:
+          type: string
+        commit_sha:
+          type: string
+          nullable: true
+        commit_message:
+          type: string
+          nullable: true
+        branch:
+          type: string
+          nullable: true
+        deployed_by:
+          type: string
+          nullable: true
+        status:
+          $ref: '#/components/schemas/DeploymentStatus'
+        duration_seconds:
+          type: integer
+          nullable: true
+        details:
+          type: string
+          nullable: true
+        deployed_at:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+
+    CreateDeploymentRequest:
+      type: object
+      required:
+        - product_name
+        - version
+      properties:
+        product_name:
+          type: string
+        environment:
+          type: string
+          default: production
+        version:
+          type: string
+        commit_sha:
+          type: string
+          nullable: true
+        commit_message:
+          type: string
+          nullable: true
+        branch:
+          type: string
+          nullable: true
+        deployed_by:
+          type: string
+          nullable: true
+        status:
+          $ref: '#/components/schemas/DeploymentStatus'
+          default: SUCCESS
+        duration_seconds:
+          type: integer
+          nullable: true
+        details:
+          type: string
+          nullable: true
+        deployed_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    ListDeploymentsResponse:
+      type: object
+      required:
+        - items
+        - total
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Deployment'
+        total:
+          type: integer
+
 paths:
   /servers:
     get:
@@ -713,5 +823,102 @@ paths:
             text/plain:
               schema:
                 type: string
+
+  /servers/{id}/deploys:
+    get:
+      operationId: listServerDeployments
+      summary: Llista els desplegaments registrats per a un servidor
+      tags: [servers]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+        - name: offset
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: Llistat de desplegaments
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListDeploymentsResponse'
+        '403':
+          description: No autoritzat
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    post:
+      operationId: createServerDeployment
+      summary: Registra un desplegament per al servidor indicat (suporta JWT o X-Agent-Key)
+      tags: [servers]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateDeploymentRequest'
+      responses:
+        '201':
+          description: Desplegament registrat
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Deployment'
+        '400':
+          description: Dades invàlides
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /deploys:
+    post:
+      operationId: createDirectDeployment
+      summary: Registra un desplegament des de CI/CD (GitHub Actions) usant la clau X-Agent-Key
+      tags: [servers]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateDeploymentRequest'
+      responses:
+        '201':
+          description: Desplegament registrat
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Deployment'
+        '401':
+          description: API Key invàlida o absent
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
 
 

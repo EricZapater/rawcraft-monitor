@@ -17,6 +17,10 @@ export type UpdateServerRequest = components['schemas']['UpdateServerRequest'];
 export type RotateApiKeyResponse = components['schemas']['RotateApiKeyResponse'];
 export type ServerYamlBundleResponse = components['schemas']['ServerYamlBundleResponse'];
 export type ServerErrorResponse = components['schemas']['ErrorResponse'];
+export type DeploymentStatus = components['schemas']['DeploymentStatus'];
+export type Deployment = components['schemas']['Deployment'];
+export type CreateDeploymentRequest = components['schemas']['CreateDeploymentRequest'];
+export type ListDeploymentsResponse = components['schemas']['ListDeploymentsResponse'];
 
 export const serversApi = {
   async listServers(): Promise<Server[]> {
@@ -52,6 +56,28 @@ export const serversApi = {
 
   async getServerConfigYaml(id: string): Promise<ServerYamlBundleResponse> {
     const { data } = await apiClient.get<ServerYamlBundleResponse>(`/servers/${id}/config-yaml`);
+    return data;
+  },
+
+  async listServerDeployments(
+    serverId: string,
+    params?: { limit?: number; offset?: number }
+  ): Promise<ListDeploymentsResponse> {
+    const { data } = await apiClient.get<ListDeploymentsResponse>(
+      `/servers/${serverId}/deploys`,
+      { params }
+    );
+    return data;
+  },
+
+  async createServerDeployment(
+    serverId: string,
+    payload: CreateDeploymentRequest
+  ): Promise<Deployment> {
+    const { data } = await apiClient.post<Deployment>(
+      `/servers/${serverId}/deploys`,
+      payload
+    );
     return data;
   },
 };
