@@ -1,0 +1,28 @@
+CHANGELOG.md
+  h_42175f19913982 8-21
+VERSION
+  h_42175f19913982 1
+backend/internal/agent/collector_postgres.go
+  h_42175f19913982 6,67-68,77,82
+backend/internal/agent/evaluator.go
+  h_42175f19913982 5,199-229
+backend/internal/agent/evaluator_test.go
+  h_42175f19913982 99-109
+backend/internal/agent/runner.go
+  h_42175f19913982 36
+backend/internal/alert/service.go
+  h_42175f19913982 72-77
+backend/internal/shared/smtp.go
+  h_42175f19913982 4,6-7,12,59,62-70,87-155,157
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "161fca8201b419b9786068574a153eb7c8d2e407",
+  "prompts": {},
+  "humans": {
+    "h_42175f19913982": {
+      "author": "Èric Zapater <ericzm@ext.inditex.com>"
+    }
+  }
+}
