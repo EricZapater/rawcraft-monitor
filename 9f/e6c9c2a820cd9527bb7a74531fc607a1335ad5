@@ -1,0 +1,32 @@
+CHANGELOG.md
+  h_42175f19913982 8-18
+VERSION
+  h_42175f19913982 1
+backend/internal/agent/collector_docker.go
+  h_42175f19913982 7,103-106,112-116,118-125,127-162,164-178,180-181,183-192,195-197,215,235-239
+backend/internal/agent/runner.go
+  h_42175f19913982 114
+backend/internal/telemetry/model.go
+  h_42175f19913982 55-59,115-122
+backend/internal/telemetry/service.go
+  h_42175f19913982 148-152
+contracts/telemetry.openapi.yaml
+  h_42175f19913982 180-185,325-332
+frontend/src/modules/telemetry/types.ts
+  h_42175f19913982 170-172,224-227
+frontend/src/modules/telemetry/views/DashboardView.tsx
+  h_42175f19913982 368,372,387,390-410
+frontend/src/modules/telemetry/views/ServerDetailView.tsx
+  h_42175f19913982 197-198,201-208
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "9fe6c9c2a820cd9527bb7a74531fc607a1335ad5",
+  "prompts": {},
+  "humans": {
+    "h_42175f19913982": {
+      "author": "Èric Zapater <ericzm@ext.inditex.com>"
+    }
+  }
+}
