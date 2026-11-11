@@ -1,0 +1,36 @@
+qa-reports/alert.md
+  h_42175f19913982 1-37
+qa-reports/server.md
+  h_42175f19913982 1-40
+qa-reports/telemetry.md
+  h_42175f19913982 1-41
+qa-reports/user.md
+  h_42175f19913982 1-39
+security-reports/alert.md
+  h_42175f19913982 1-40
+security-reports/server.md
+  h_42175f19913982 1-43
+security-reports/telemetry.md
+  h_42175f19913982 1-45
+security-reports/user.md
+  h_42175f19913982 1-48
+ux-reports/alert.md
+  h_42175f19913982 1-40
+ux-reports/server.md
+  h_42175f19913982 1-43
+ux-reports/telemetry.md
+  h_42175f19913982 1-41
+ux-reports/user.md
+  h_42175f19913982 1-42
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "790a08b8474aa9d037b55e96f3e4cbdec2c11f1d",
+  "prompts": {},
+  "humans": {
+    "h_42175f19913982": {
+      "author": "Èric Zapater <ericzm@ext.inditex.com>"
+    }
+  }
+}
