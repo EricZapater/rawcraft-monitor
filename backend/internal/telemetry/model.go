@@ -70,17 +70,25 @@ type HttpEndpointSnapshot struct {
 	ErrorMessage        *string `json:"error_message,omitempty"`
 }
 
+type PostgresDatabaseInfo struct {
+	Name      string  `json:"name"`
+	SizeMB    float64 `json:"size_mb"`
+	SizeBytes int64   `json:"size_bytes,omitempty"`
+}
+
 type PostgresInstanceSnapshot struct {
-	Name               string  `json:"name"`
-	Up                 bool    `json:"up"`
-	LatencyMs          int     `json:"latency_ms"`
-	ActiveConnections  int     `json:"active_connections"`
-	MaxConnections     int     `json:"max_connections"`
-	ConnectionsPercent float64 `json:"connections_percent"`
-	DatabaseSizeMB     float64 `json:"database_size_mb"`
-	LongRunningQueries int     `json:"long_running_queries"`
-	LocksWaiting       int     `json:"locks_waiting"`
-	ErrorMessage       *string `json:"error_message,omitempty"`
+	Name               string                 `json:"name"`
+	Up                 bool                   `json:"up"`
+	LatencyMs          int                    `json:"latency_ms"`
+	ActiveConnections  int                    `json:"active_connections"`
+	MaxConnections     int                    `json:"max_connections"`
+	ConnectionsPercent float64                `json:"connections_percent"`
+	DatabaseSizeMB     float64                `json:"database_size_mb"`
+	DatabasesCount     int                    `json:"databases_count"`
+	Databases          []PostgresDatabaseInfo `json:"databases,omitempty"`
+	LongRunningQueries int                    `json:"long_running_queries"`
+	LocksWaiting       int                    `json:"locks_waiting"`
+	ErrorMessage       *string                `json:"error_message,omitempty"`
 }
 
 type TelemetryIngestRequest struct {

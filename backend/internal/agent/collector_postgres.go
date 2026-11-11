@@ -88,10 +88,47 @@ func checkPostgresInstance(ctx context.Context, inst server.PostgresInstanceConf
 		snap.ConnectionsPercent = round2((float64(snap.ActiveConnections) / float64(snap.MaxConnections)) * 100.0)
 	}
 
-	// Mida de la base de dades en MB
-	var dbBytes int64
-	if err := conn.QueryRow(connCtx, `SELECT pg_database_size(current_database())`).Scan(&dbBytes); err == nil {
-		snap.DatabaseSizeMB = round2(float64(dbBytes) / (1024.0 * 1024.0))
+	// Llistat i mida de totes les bases de dades (excloent plantilles)
+	rows, err := conn.Query(connCtx, `
+		SELECT 
+			datname,
+			COALESCE(pg_database_size(datname), 0)::bigint
+		FROM pg_database
+		WHERE datistemplate = false
+		ORDER BY pg_database_size(datname) DESC
+	`)
+	databases := make([]telemetry.PostgresDatabaseInfo, 0)
+	var totalSizeMB float64
+	if err == nil {
+		for rows.Next() {
+			var name string
+			var bytes int64
+			if err := rows.Scan(&name, &bytes); err == nil {
+				mb := round2(float64(bytes) / (1024.0 * 1024.0))
+				totalSizeMB += mb
+				databases = append(databases, telemetry.PostgresDatabaseInfo{
+					Name:      name,
+					SizeMB:    mb,
+					SizeBytes: bytes,
+				})
+			}
+		}
+		rows.Close()
+	} else {
+		log.Printf("[agent] [postgres] No s'ha pogut llistar 'pg_database' a '%s': %v", inst.Name, err)
+	}
+
+	snap.Databases = databases
+	snap.DatabasesCount = len(databases)
+
+	// Mida total de la instància en MB
+	if len(databases) > 0 {
+		snap.DatabaseSizeMB = round2(totalSizeMB)
+	} else {
+		var dbBytes int64
+		if err := conn.QueryRow(connCtx, `SELECT pg_database_size(current_database())`).Scan(&dbBytes); err == nil {
+			snap.DatabaseSizeMB = round2(float64(dbBytes) / (1024.0 * 1024.0))
+		}
 	}
 
 	// Consultes lentes i locks en espera

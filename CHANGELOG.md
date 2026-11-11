@@ -5,6 +5,19 @@ Tots els canvis rellevants d'aquest projecte es documenten en aquest fitxer.
 El format es basa en [Keep a Changelog](https://keepachangelog.com/ca/1.0.0/),
 i aquest projecte segueix [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.7] - 2026-11-11
+
+### Added
+- **Inspecció multi-base de dades PostgreSQL (`pg_database`)**:
+  - L'agent ([`collector_postgres.go`](backend/internal/agent/collector_postgres.go)) consulta `pg_database` (excloent plantilles `datistemplate = false`) per obtenir la llista de totes les bases de dades de cada instància PostgreSQL, la seva mida individual (`pg_database_size`) en MB i Bytes, el recompte total (`databases_count`) i la suma acumulada de mida (`database_size_mb`).
+  - Actualitzat el contracte OpenAPI ([`telemetry.openapi.yaml`](contracts/telemetry.openapi.yaml)) amb l'esquema `PostgresDatabaseInfo`, `databases_count` i `databases`, sincronitzat amb el model Go ([`telemetry/model.go`](backend/internal/telemetry/model.go)) i els tipus TypeScript del frontend ([`telemetry/types.ts`](frontend/src/modules/telemetry/types.ts)).
+- **Vista de Detall del Servidor en Pestanyes i Taules Paginades (20 / 50 files)**:
+  - Reestructurada la vista [`ServerDetailView.tsx`](frontend/src/modules/telemetry/views/ServerDetailView.tsx) amb pestanyes accessibles (WAI-ARIA) per a:
+    1. **🐳 Contenidors Docker**: mètriques de CPU/RAM, estat/healthcheck, ordenació per nom, CPU i memòria, i comptadors de llista blanca vs totals.
+    2. **🌐 Endpoints HTTP**: estat de resposta (200/202), latència i codi d'estat.
+    3. **🐘 Bases de Dades (PostgreSQL)**: mètriques d'instància (connexions actives vs màximes, locks, consultes lentes, mida total) i una nova taula amb totes les bases de dades individuals, mida en MB/GB, gràfica de % d'ocupació a la instància i ordenació per nom o mida.
+  - Totes les taules incorporen paginació client (`TablePagination`) amb opcions de 20 o 50 registres per pàgina.
+
 ## [0.1.6] - 2026-11-11
 
 ### Fixed

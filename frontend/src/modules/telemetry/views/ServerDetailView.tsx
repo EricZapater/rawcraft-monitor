@@ -7,18 +7,82 @@ import {
   Button,
   Alert,
   CircularProgress,
+  Tabs,
+  Tab,
+  TablePagination,
 } from '@mui/material';
 import { useTelemetryStore } from '../store';
-import type { DockerContainerSnapshot } from '../api';
+import type {
+  DockerContainerSnapshot,
+  HttpEndpointSnapshot,
+  PostgresDatabaseInfo,
+  PostgresInstanceSnapshot,
+} from '../api';
 
-type SortField = 'name' | 'cpu_percent' | 'memory_percent';
+type DockerSortField = 'name' | 'cpu_percent' | 'memory_percent';
+type DbSortField = 'name' | 'size_mb';
+
+interface FlattenedDatabaseItem extends PostgresDatabaseInfo {
+  instanceName: string;
+  instanceTotalMB: number;
+}
+
+function a11yProps(index: number) {
+  return {
+    id: `server-tab-${index}`,
+    'aria-controls': `server-tabpanel-${index}`,
+  };
+}
+
+interface TabPanelProps {
+  children?: React.ReactNode;
+  index: number;
+  value: number;
+}
+
+function TabPanel(props: TabPanelProps) {
+  const { children, value, index, ...other } = props;
+  return (
+    <div
+      role="tabpanel"
+      hidden={value !== index}
+      id={`server-tabpanel-${index}`}
+      aria-labelledby={`server-tab-${index}`}
+      {...other}
+    >
+      {value === index && <Box sx={{ pt: 1.5 }}>{children}</Box>}
+    </div>
+  );
+}
+
+function formatBytesOrMB(mb: number): string {
+  if (mb >= 1024) {
+    return `${(mb / 1024).toFixed(2)} GB`;
+  }
+  return `${mb.toFixed(2)} MB`;
+}
 
 export const ServerDetailView: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const { liveDetail, loading, error, fetchLiveDetail, clearError } = useTelemetryStore();
 
-  const [sortBy, setSortBy] = useState<SortField>('memory_percent');
-  const [sortAsc, setSortAsc] = useState(false);
+  const [activeTab, setActiveTab] = useState<number>(0);
+
+  // Paginació i ordenació de Docker
+  const [dockerSortBy, setDockerSortBy] = useState<DockerSortField>('memory_percent');
+  const [dockerSortAsc, setDockerSortAsc] = useState(false);
+  const [dockerPage, setDockerPage] = useState<number>(0);
+  const [dockerRowsPerPage, setDockerRowsPerPage] = useState<number>(20);
+
+  // Paginació d'Endpoints HTTP
+  const [httpPage, setHttpPage] = useState<number>(0);
+  const [httpRowsPerPage, setHttpRowsPerPage] = useState<number>(20);
+
+  // Paginació i ordenació de Bases de Dades PostgreSQL
+  const [dbSortBy, setDbSortBy] = useState<DbSortField>('size_mb');
+  const [dbSortAsc, setDbSortAsc] = useState<boolean>(false);
+  const [dbPage, setDbPage] = useState<number>(0);
+  const [dbRowsPerPage, setDbRowsPerPage] = useState<number>(20);
 
   useEffect(() => {
     if (!id) return;
@@ -32,23 +96,69 @@ export const ServerDetailView: React.FC = () => {
   const sortedContainers: DockerContainerSnapshot[] = useMemo(() => {
     const list = [...(liveDetail?.docker?.containers ?? [])];
     list.sort((a, b) => {
-      const mul = sortAsc ? 1 : -1;
-      if (sortBy === 'name') {
+      const mul = dockerSortAsc ? 1 : -1;
+      if (dockerSortBy === 'name') {
         return a.name.localeCompare(b.name) * mul;
       }
-      return (a[sortBy] - b[sortBy]) * mul;
+      return (a[dockerSortBy] - b[dockerSortBy]) * mul;
     });
     return list;
-  }, [liveDetail?.docker?.containers, sortBy, sortAsc]);
+  }, [liveDetail?.docker?.containers, dockerSortBy, dockerSortAsc]);
 
-  const handleSort = (field: SortField) => {
-    if (sortBy === field) {
-      setSortAsc((prev) => !prev);
+  const handleDockerSort = (field: DockerSortField) => {
+    if (dockerSortBy === field) {
+      setDockerSortAsc((prev) => !prev);
     } else {
-      setSortBy(field);
-      setSortAsc(false);
+      setDockerSortBy(field);
+      setDockerSortAsc(false);
     }
+    setDockerPage(0);
   };
+
+  const httpEndpoints: HttpEndpointSnapshot[] = useMemo(() => {
+    return liveDetail?.http_endpoints ?? [];
+  }, [liveDetail?.http_endpoints]);
+
+  const pgInstances: PostgresInstanceSnapshot[] = useMemo(() => {
+    return liveDetail?.postgres_instances ?? [];
+  }, [liveDetail?.postgres_instances]);
+
+  const allDatabases: FlattenedDatabaseItem[] = useMemo(() => {
+    const list: FlattenedDatabaseItem[] = [];
+    for (const pg of pgInstances) {
+      if (pg.databases && pg.databases.length > 0) {
+        for (const db of pg.databases) {
+          list.push({
+            ...db,
+            instanceName: pg.name,
+            instanceTotalMB: pg.database_size_mb || 0,
+          });
+        }
+      }
+    }
+    list.sort((a, b) => {
+      const mul = dbSortAsc ? 1 : -1;
+      if (dbSortBy === 'name') {
+        return a.name.localeCompare(b.name) * mul;
+      }
+      return (a.size_mb - b.size_mb) * mul;
+    });
+    return list;
+  }, [pgInstances, dbSortBy, dbSortAsc]);
+
+  const handleDbSort = (field: DbSortField) => {
+    if (dbSortBy === field) {
+      setDbSortAsc((prev) => !prev);
+    } else {
+      setDbSortBy(field);
+      setDbSortAsc(false);
+    }
+    setDbPage(0);
+  };
+
+  const totalPostgresSizeMB = useMemo(() => {
+    return pgInstances.reduce((acc, inst) => acc + (inst.database_size_mb || 0), 0);
+  }, [pgInstances]);
 
   if (loading && !liveDetail) {
     return (
@@ -60,9 +170,23 @@ export const ServerDetailView: React.FC = () => {
 
   const host = liveDetail?.host;
   const rootDisk = host?.disks?.find((d) => d.mount_point === '/') ?? host?.disks?.[0];
-  const httpEndpoints = liveDetail?.http_endpoints ?? [];
-  const pgInstances = liveDetail?.postgres_instances ?? [];
   const dockerDaemonUp = liveDetail?.docker?.docker_daemon_up ?? true;
+
+  // Paginació de llistes
+  const paginatedContainers = sortedContainers.slice(
+    dockerPage * dockerRowsPerPage,
+    (dockerPage + 1) * dockerRowsPerPage
+  );
+
+  const paginatedHttpEndpoints = httpEndpoints.slice(
+    httpPage * httpRowsPerPage,
+    (httpPage + 1) * httpRowsPerPage
+  );
+
+  const paginatedDatabases = allDatabases.slice(
+    dbPage * dbRowsPerPage,
+    (dbPage + 1) * dbRowsPerPage
+  );
 
   return (
     <Box>
@@ -88,14 +212,14 @@ export const ServerDetailView: React.FC = () => {
             ← Tornar al Dashboard
           </Button>
           <Typography sx={{ fontSize: 15, fontWeight: 700, color: '#1e293b' }}>
-            Detall en viu: <code>{liveDetail?.server_name || id}</code> (`HU-TEL-03`)
+            Detall en viu: <code>{liveDetail?.server_name || id}</code>
           </Typography>
         </Box>
 
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
           <Typography sx={{ fontSize: 12.5, color: '#64748b' }}>
-            System information as of{' '}
-            {liveDetail?.recorded_at ? new Date(liveDetail.recorded_at).toUTCString() : 'N/A'}
+            Informació actualitzada:{' '}
+            {liveDetail?.recorded_at ? new Date(liveDetail.recorded_at).toLocaleTimeString() : 'N/A'}
           </Typography>
           {id && (
             <Button
@@ -150,7 +274,7 @@ export const ServerDetailView: React.FC = () => {
               ? `${host.load_1m.toFixed(2)} / ${host.load_5m.toFixed(2)} / ${host.load_15m.toFixed(2)}`
               : '—'}{' '}
             &nbsp;|&nbsp; <strong>Disc /:</strong>{' '}
-            {rootDisk ? `${rootDisk.used_percent.toFixed(1)}% of ${rootDisk.total_gb.toFixed(2)}GB` : '—'}{' '}
+            {rootDisk ? `${rootDisk.used_percent.toFixed(1)}% de ${rootDisk.total_gb.toFixed(2)}GB` : '—'}{' '}
             &nbsp;|&nbsp; <strong>RAM:</strong> {host ? `${Math.round(host.memory_percent)}%` : '—'}{' '}
             &nbsp;|&nbsp; <strong>Swap:</strong> {host ? `${Math.round(host.swap_percent)}%` : '—'}{' '}
             &nbsp;|&nbsp; <strong>Procs:</strong> {host?.processes_count ?? '—'} &nbsp;|&nbsp;{' '}
@@ -177,169 +301,110 @@ export const ServerDetailView: React.FC = () => {
         )}
       </Paper>
 
-      {/* TAULA DE CONTENIDORS DOCKER AMB CPU I RAM */}
+      {/* PESTANYES DE MONITORATGE */}
       <Paper
         elevation={0}
         sx={{
           border: '1px solid #e2e8f0',
           borderRadius: '10px',
+          bgcolor: '#fff',
           mb: 2.5,
-          overflow: 'hidden',
+          px: 1,
         }}
       >
-        <Box
+        <Tabs
+          value={activeTab}
+          onChange={(_e, val) => setActiveTab(val)}
+          aria-label="Pestanyes de recursos del servidor"
           sx={{
-            p: '14px 20px',
-            borderBottom: '1px solid #e2e8f0',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            flexWrap: 'wrap',
-            gap: 1,
+            '& .MuiTab-root': {
+              textTransform: 'none',
+              fontWeight: 600,
+              fontSize: 14,
+              minHeight: 48,
+              color: '#64748b',
+              '&.Mui-selected': {
+                color: '#1976d2',
+              },
+            },
+            '& .MuiTabs-indicator': {
+              backgroundColor: '#1976d2',
+              height: 3,
+              borderRadius: '3px 3px 0 0',
+            },
           }}
         >
-          <Box>
-            <Typography sx={{ fontWeight: 700, fontSize: 15, color: '#1e293b' }}>
-              Contenidors Docker Monitoritzats (Llista Blanca)
-            </Typography>
-            <Typography sx={{ fontSize: 12, color: '#64748b', mt: 0.25 }}>
-              {sortedContainers.length} monitoritzats • Total al host: {liveDetail?.docker?.total_host_containers ?? sortedContainers.length} ({liveDetail?.docker?.running_host_containers ?? sortedContainers.length} actius, {liveDetail?.docker?.stopped_host_containers ?? 0} aturats)
-            </Typography>
-          </Box>
-          <Typography
-            sx={{
-              fontFamily: '"Roboto Mono", monospace',
-              fontSize: 12,
-              fontWeight: 600,
-              color: dockerDaemonUp ? '#16a34a' : '#dc2626',
-            }}
-          >
-            dockerd: {dockerDaemonUp ? 'UP' : 'DOWN'}
-          </Typography>
-        </Box>
-
-        <Box
-          tabIndex={0}
-          role="region"
-          aria-label="Taula de contenidors Docker amb CPU i RAM"
-          sx={{ overflowX: 'auto', maxWidth: '100%' }}
-        >
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: 13 }}>
-            <thead style={{ position: 'sticky', insetBlockStart: 0, zIndex: 1 }}>
-              <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
-                <th
-                  onClick={() => handleSort('name')}
-                  style={{ padding: '11px 16px', fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase', cursor: 'pointer' }}
+          <Tab
+            label={
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <span>🐳 Dockers</span>
+                <Box
+                  component="span"
+                  sx={{
+                    bgcolor: activeTab === 0 ? '#dbeafe' : '#f1f5f9',
+                    color: activeTab === 0 ? '#1e40af' : '#475569',
+                    px: 1,
+                    py: 0.2,
+                    borderRadius: '10px',
+                    fontSize: 11.5,
+                    fontWeight: 700,
+                  }}
                 >
-                  Contenidor {sortBy === 'name' ? (sortAsc ? '↑' : '↓') : ''}
-                </th>
-                <th style={{ padding: '11px 16px', fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase' }}>
-                  Imatge
-                </th>
-                <th style={{ padding: '11px 16px', fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase' }}>
-                  Estat &amp; Healthcheck
-                </th>
-                <th style={{ padding: '11px 16px', fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase' }}>
-                  Uptime / Status
-                </th>
-                <th
-                  onClick={() => handleSort('cpu_percent')}
-                  style={{ padding: '11px 16px', fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase', cursor: 'pointer' }}
+                  {sortedContainers.length}
+                </Box>
+              </Box>
+            }
+            {...a11yProps(0)}
+          />
+          <Tab
+            label={
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <span>🌐 Endpoints HTTP</span>
+                <Box
+                  component="span"
+                  sx={{
+                    bgcolor: activeTab === 1 ? '#dbeafe' : '#f1f5f9',
+                    color: activeTab === 1 ? '#1e40af' : '#475569',
+                    px: 1,
+                    py: 0.2,
+                    borderRadius: '10px',
+                    fontSize: 11.5,
+                    fontWeight: 700,
+                  }}
                 >
-                  CPU (%) {sortBy === 'cpu_percent' ? (sortAsc ? '↑' : '↓') : ''}
-                </th>
-                <th
-                  onClick={() => handleSort('memory_percent')}
-                  style={{ padding: '11px 16px', fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase', cursor: 'pointer' }}
+                  {httpEndpoints.length}
+                </Box>
+              </Box>
+            }
+            {...a11yProps(1)}
+          />
+          <Tab
+            label={
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <span>🐘 Bases de Dades (PostgreSQL)</span>
+                <Box
+                  component="span"
+                  sx={{
+                    bgcolor: activeTab === 2 ? '#dbeafe' : '#f1f5f9',
+                    color: activeTab === 2 ? '#1e40af' : '#475569',
+                    px: 1,
+                    py: 0.2,
+                    borderRadius: '10px',
+                    fontSize: 11.5,
+                    fontWeight: 700,
+                  }}
                 >
-                  Memòria RAM (MB / Límit / %) {sortBy === 'memory_percent' ? (sortAsc ? '↑' : '↓') : ''}
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {sortedContainers.length === 0 ? (
-                <tr>
-                  <td colSpan={6} style={{ padding: 24, textAlign: 'center', color: '#64748b' }}>
-                    Cap contenidor reportat en l&apos;últim snapshot.
-                  </td>
-                </tr>
-              ) : (
-                sortedContainers.map((c) => {
-                  const isOk = c.state === 'running' && c.health !== 'unhealthy';
-                  return (
-                    <tr key={c.container_id || c.name} style={{ borderBottom: '1px solid #e2e8f0' }}>
-                      <td style={{ padding: '12px 16px', fontFamily: '"Roboto Mono", monospace', fontWeight: 700 }}>
-                        {c.name}
-                      </td>
-                      <td style={{ padding: '12px 16px', fontFamily: '"Roboto Mono", monospace', fontSize: 12 }}>
-                        {c.image}
-                      </td>
-                      <td style={{ padding: '12px 16px' }}>
-                        <Box
-                          component="span"
-                          sx={{
-                            display: 'inline-block',
-                            px: 1,
-                            py: 0.35,
-                            borderRadius: '12px',
-                            fontSize: 11,
-                            fontWeight: 600,
-                            bgcolor: isOk ? '#dcfce7' : '#fee2e2',
-                            color: isOk ? '#166534' : '#991b1b',
-                          }}
-                        >
-                          {c.state}
-                          {c.health && c.health !== 'none' ? ` (${c.health})` : ''}
-                          {!isOk && c.exit_code ? ` [${c.exit_code}]` : ''}
-                        </Box>
-                      </td>
-                      <td style={{ padding: '12px 16px' }}>{c.status}</td>
-                      <td style={{ padding: '12px 16px', fontFamily: '"Roboto Mono", monospace', fontSize: 12 }}>
-                        {c.cpu_percent.toFixed(1)}%
-                      </td>
-                      <td style={{ padding: '12px 16px', fontFamily: '"Roboto Mono", monospace', fontSize: 12 }}>
-                        <Box
-                          component="span"
-                          sx={{
-                            width: 110,
-                            height: 7,
-                            bgcolor: '#e2e8f0',
-                            borderRadius: '4px',
-                            overflow: 'hidden',
-                            display: 'inline-block',
-                            verticalAlign: 'middle',
-                            mr: 1,
-                          }}
-                        >
-                          <Box
-                            sx={{
-                              height: '100%',
-                              width: `${Math.min(100, Math.max(0, c.memory_percent))}%`,
-                              bgcolor: c.memory_percent > 85 ? '#dc2626' : '#1976d2',
-                            }}
-                          />
-                        </Box>
-                        {Math.round(c.memory_used_mb)} MB / {Math.round(c.memory_limit_mb)} MB (
-                        {c.memory_percent.toFixed(1)}%)
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </Box>
+                  {allDatabases.length > 0 ? `${allDatabases.length} bbdd` : `${pgInstances.length} inst.`}
+                </Box>
+              </Box>
+            }
+            {...a11yProps(2)}
+          />
+        </Tabs>
       </Paper>
 
-      {/* GRID ENDPOINTS HTTP (200/202) & POTETA POSTGRESQL */}
-      <Box
-        sx={{
-          display: 'grid',
-          gridTemplateColumns: { xs: '1fr', lg: '1.2fr 0.8fr' },
-          gap: 2.5,
-        }}
-      >
-        {/* TAULA D'ENDPOINTS HTTP */}
+      {/* PESTANYA 0: DOCKERS */}
+      <TabPanel value={activeTab} index={0}>
         <Paper
           elevation={0}
           sx={{
@@ -348,11 +413,224 @@ export const ServerDetailView: React.FC = () => {
             overflow: 'hidden',
           }}
         >
-          <Box sx={{ p: '14px 20px', borderBottom: '1px solid #e2e8f0' }}>
-            <Typography sx={{ fontWeight: 700, fontSize: 15, color: '#1e293b' }}>
-              Endpoints HTTP d&apos;Aplicacions (Esperant 200 / 202)
+          <Box
+            sx={{
+              p: '14px 20px',
+              borderBottom: '1px solid #e2e8f0',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: 1,
+            }}
+          >
+            <Box>
+              <Typography sx={{ fontWeight: 700, fontSize: 15, color: '#1e293b' }}>
+                Contenidors Docker Monitoritzats (Llista Blanca)
+              </Typography>
+              <Typography sx={{ fontSize: 12, color: '#64748b', mt: 0.25 }}>
+                {sortedContainers.length} monitoritzats • Total al host:{' '}
+                {liveDetail?.docker?.total_host_containers ?? sortedContainers.length} (
+                {liveDetail?.docker?.running_host_containers ?? sortedContainers.length} actius,{' '}
+                {liveDetail?.docker?.stopped_host_containers ?? 0} aturats)
+              </Typography>
+            </Box>
+            <Typography
+              sx={{
+                fontFamily: '"Roboto Mono", monospace',
+                fontSize: 12,
+                fontWeight: 600,
+                color: dockerDaemonUp ? '#16a34a' : '#dc2626',
+              }}
+            >
+              dockerd: {dockerDaemonUp ? 'UP' : 'DOWN'}
             </Typography>
           </Box>
+
+          <Box
+            tabIndex={0}
+            role="region"
+            aria-label="Taula de contenidors Docker amb CPU i RAM"
+            sx={{ overflowX: 'auto', maxWidth: '100%' }}
+          >
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: 13 }}>
+              <thead style={{ position: 'sticky', top: 0, zIndex: 1 }}>
+                <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+                  <th
+                    onClick={() => handleDockerSort('name')}
+                    style={{
+                      padding: '11px 16px',
+                      fontSize: 11,
+                      fontWeight: 600,
+                      color: '#64748b',
+                      textTransform: 'uppercase',
+                      cursor: 'pointer',
+                      userSelect: 'none',
+                    }}
+                  >
+                    Contenidor {dockerSortBy === 'name' ? (dockerSortAsc ? '↑' : '↓') : ''}
+                  </th>
+                  <th style={{ padding: '11px 16px', fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase' }}>
+                    Imatge
+                  </th>
+                  <th style={{ padding: '11px 16px', fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase' }}>
+                    Estat &amp; Healthcheck
+                  </th>
+                  <th style={{ padding: '11px 16px', fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase' }}>
+                    Uptime / Status
+                  </th>
+                  <th
+                    onClick={() => handleDockerSort('cpu_percent')}
+                    style={{
+                      padding: '11px 16px',
+                      fontSize: 11,
+                      fontWeight: 600,
+                      color: '#64748b',
+                      textTransform: 'uppercase',
+                      cursor: 'pointer',
+                      userSelect: 'none',
+                    }}
+                  >
+                    CPU (%) {dockerSortBy === 'cpu_percent' ? (dockerSortAsc ? '↑' : '↓') : ''}
+                  </th>
+                  <th
+                    onClick={() => handleDockerSort('memory_percent')}
+                    style={{
+                      padding: '11px 16px',
+                      fontSize: 11,
+                      fontWeight: 600,
+                      color: '#64748b',
+                      textTransform: 'uppercase',
+                      cursor: 'pointer',
+                      userSelect: 'none',
+                    }}
+                  >
+                    Memòria RAM (MB / Límit / %) {dockerSortBy === 'memory_percent' ? (dockerSortAsc ? '↑' : '↓') : ''}
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {paginatedContainers.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} style={{ padding: 24, textAlign: 'center', color: '#64748b' }}>
+                      Cap contenidor reportat en aquest snapshot.
+                    </td>
+                  </tr>
+                ) : (
+                  paginatedContainers.map((c) => {
+                    const isOk = c.state === 'running' && c.health !== 'unhealthy';
+                    return (
+                      <tr key={c.container_id || c.name} style={{ borderBottom: '1px solid #e2e8f0' }}>
+                        <td style={{ padding: '12px 16px', fontFamily: '"Roboto Mono", monospace', fontWeight: 700 }}>
+                          {c.name}
+                        </td>
+                        <td style={{ padding: '12px 16px', fontFamily: '"Roboto Mono", monospace', fontSize: 12 }}>
+                          {c.image}
+                        </td>
+                        <td style={{ padding: '12px 16px' }}>
+                          <Box
+                            component="span"
+                            sx={{
+                              display: 'inline-block',
+                              px: 1,
+                              py: 0.35,
+                              borderRadius: '12px',
+                              fontSize: 11,
+                              fontWeight: 600,
+                              bgcolor: isOk ? '#dcfce7' : '#fee2e2',
+                              color: isOk ? '#166534' : '#991b1b',
+                            }}
+                          >
+                            {c.state}
+                            {c.health && c.health !== 'none' ? ` (${c.health})` : ''}
+                            {!isOk && c.exit_code ? ` [${c.exit_code}]` : ''}
+                          </Box>
+                        </td>
+                        <td style={{ padding: '12px 16px' }}>{c.status}</td>
+                        <td style={{ padding: '12px 16px', fontFamily: '"Roboto Mono", monospace', fontSize: 12 }}>
+                          {c.cpu_percent.toFixed(1)}%
+                        </td>
+                        <td style={{ padding: '12px 16px', fontFamily: '"Roboto Mono", monospace', fontSize: 12 }}>
+                          <Box
+                            component="span"
+                            sx={{
+                              width: 110,
+                              height: 7,
+                              bgcolor: '#e2e8f0',
+                              borderRadius: '4px',
+                              overflow: 'hidden',
+                              display: 'inline-block',
+                              verticalAlign: 'middle',
+                              mr: 1,
+                            }}
+                          >
+                            <Box
+                              sx={{
+                                height: '100%',
+                                width: `${Math.min(100, Math.max(0, c.memory_percent))}%`,
+                                bgcolor: c.memory_percent > 85 ? '#dc2626' : '#1976d2',
+                              }}
+                            />
+                          </Box>
+                          {Math.round(c.memory_used_mb)} MB / {Math.round(c.memory_limit_mb)} MB (
+                          {c.memory_percent.toFixed(1)}%)
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </Box>
+
+          <TablePagination
+            component="div"
+            count={sortedContainers.length}
+            page={dockerPage}
+            onPageChange={(_e, newPage) => setDockerPage(newPage)}
+            rowsPerPage={dockerRowsPerPage}
+            onRowsPerPageChange={(e) => {
+              setDockerRowsPerPage(parseInt(e.target.value, 10));
+              setDockerPage(0);
+            }}
+            rowsPerPageOptions={[20, 50]}
+            labelRowsPerPage="Files per pàgina:"
+            labelDisplayedRows={({ from, to, count }) => `${from}–${to} de ${count}`}
+          />
+        </Paper>
+      </TabPanel>
+
+      {/* PESTANYA 1: ENDPOINTS HTTP */}
+      <TabPanel value={activeTab} index={1}>
+        <Paper
+          elevation={0}
+          sx={{
+            border: '1px solid #e2e8f0',
+            borderRadius: '10px',
+            overflow: 'hidden',
+          }}
+        >
+          <Box
+            sx={{
+              p: '14px 20px',
+              borderBottom: '1px solid #e2e8f0',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: 1,
+            }}
+          >
+            <Box>
+              <Typography sx={{ fontWeight: 700, fontSize: 15, color: '#1e293b' }}>
+                Endpoints HTTP d&apos;Aplicacions (Esperant 200 / 202)
+              </Typography>
+              <Typography sx={{ fontSize: 12, color: '#64748b', mt: 0.25 }}>
+                {httpEndpoints.filter((e) => e.up).length} operatius de {httpEndpoints.length} totals
+              </Typography>
+            </Box>
+          </Box>
+
           <Box
             tabIndex={0}
             role="region"
@@ -360,7 +638,7 @@ export const ServerDetailView: React.FC = () => {
             sx={{ overflowX: 'auto', maxWidth: '100%' }}
           >
             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: 13 }}>
-              <thead>
+              <thead style={{ position: 'sticky', top: 0, zIndex: 1 }}>
                 <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
                   <th style={{ padding: '11px 16px', fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase' }}>
                     Aplicació
@@ -380,14 +658,14 @@ export const ServerDetailView: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
-                {httpEndpoints.length === 0 ? (
+                {paginatedHttpEndpoints.length === 0 ? (
                   <tr>
                     <td colSpan={5} style={{ padding: 24, textAlign: 'center', color: '#64748b' }}>
-                      Cap endpoint HTTP configurat.
+                      Cap endpoint HTTP configurat en aquest servidor.
                     </td>
                   </tr>
                 ) : (
-                  httpEndpoints.map((ep) => (
+                  paginatedHttpEndpoints.map((ep) => (
                     <tr key={`${ep.name}-${ep.url}`} style={{ borderBottom: '1px solid #e2e8f0' }}>
                       <td style={{ padding: '12px 16px', fontWeight: 600 }}>{ep.name}</td>
                       <td style={{ padding: '12px 16px', fontFamily: '"Roboto Mono", monospace', fontSize: 12 }}>
@@ -424,149 +702,319 @@ export const ServerDetailView: React.FC = () => {
               </tbody>
             </table>
           </Box>
-        </Paper>
 
-        {/* POTETA POSTGRESQL DINS DOCKER */}
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <TablePagination
+            component="div"
+            count={httpEndpoints.length}
+            page={httpPage}
+            onPageChange={(_e, newPage) => setHttpPage(newPage)}
+            rowsPerPage={httpRowsPerPage}
+            onRowsPerPageChange={(e) => {
+              setHttpRowsPerPage(parseInt(e.target.value, 10));
+              setHttpPage(0);
+            }}
+            rowsPerPageOptions={[20, 50]}
+            labelRowsPerPage="Files per pàgina:"
+            labelDisplayedRows={({ from, to, count }) => `${from}–${to} de ${count}`}
+          />
+        </Paper>
+      </TabPanel>
+
+      {/* PESTANYA 2: BASES DE DADES (POSTGRESQL) */}
+      <TabPanel value={activeTab} index={2}>
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
+          {/* CARDS D'ESTAT DE LES INSTÀNCIES POSTGRESQL */}
           {pgInstances.length === 0 ? (
             <Paper elevation={0} sx={{ border: '1px solid #e2e8f0', borderRadius: '10px', p: 3 }}>
               <Typography sx={{ fontWeight: 700, fontSize: 15, mb: 1 }}>
-                Poteta PostgreSQL
+                Instàncies PostgreSQL
               </Typography>
               <Typography sx={{ fontSize: 13, color: '#64748b' }}>
-                Cap instància PostgreSQL activa en aquest servidor.
+                Cap instància PostgreSQL configurada o activa en aquest servidor.
               </Typography>
             </Paper>
           ) : (
-            pgInstances.map((pg) => (
-              <Paper
-                key={pg.name}
-                elevation={0}
-                sx={{
-                  border: '1px solid #e2e8f0',
-                  borderRadius: '10px',
-                  overflow: 'hidden',
-                }}
-              >
-                <Box
+            <Box
+              sx={{
+                display: 'grid',
+                gridTemplateColumns: { xs: '1fr', md: pgInstances.length > 1 ? 'repeat(2, 1fr)' : '1fr' },
+                gap: 2,
+              }}
+            >
+              {pgInstances.map((pg) => (
+                <Paper
+                  key={pg.name}
+                  elevation={0}
                   sx={{
-                    p: '14px 20px',
-                    borderBottom: '1px solid #e2e8f0',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '10px',
+                    overflow: 'hidden',
                   }}
                 >
-                  <Typography sx={{ fontWeight: 700, fontSize: 15 }}>
-                    Poteta PostgreSQL (`{pg.name}`)
-                  </Typography>
                   <Box
-                    component="span"
                     sx={{
-                      px: 1,
-                      py: 0.35,
-                      borderRadius: '12px',
-                      fontSize: 11,
-                      fontWeight: 600,
-                      bgcolor: pg.up ? '#dcfce7' : '#fee2e2',
-                      color: pg.up ? '#166534' : '#991b1b',
+                      p: '14px 20px',
+                      borderBottom: '1px solid #e2e8f0',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
                     }}
                   >
-                    SELECT 1: {pg.up ? `UP (${pg.latency_ms} ms)` : 'DOWN'}
-                  </Box>
-                </Box>
-
-                <Box sx={{ p: '18px 20px', fontSize: 13, display: 'flex', flexDirection: 'column', gap: 1.75 }}>
-                  <Box>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-                      <Typography sx={{ fontSize: 13, fontWeight: 600 }}>
-                        Connexions Actives vs. `max_connections`
-                      </Typography>
-                      <Typography sx={{ fontFamily: '"Roboto Mono", monospace', fontSize: 12 }}>
-                        {pg.active_connections} / {pg.max_connections} ({pg.connections_percent.toFixed(1)}%)
-                      </Typography>
-                    </Box>
+                    <Typography sx={{ fontWeight: 700, fontSize: 15 }}>
+                      Instància PostgreSQL: <code>{pg.name}</code>
+                    </Typography>
                     <Box
+                      component="span"
                       sx={{
-                        width: '100%',
-                        height: 9,
-                        bgcolor: '#e2e8f0',
-                        borderRadius: '4px',
-                        overflow: 'hidden',
+                        px: 1,
+                        py: 0.35,
+                        borderRadius: '12px',
+                        fontSize: 11,
+                        fontWeight: 600,
+                        bgcolor: pg.up ? '#dcfce7' : '#fee2e2',
+                        color: pg.up ? '#166534' : '#991b1b',
                       }}
                     >
+                      SELECT 1: {pg.up ? `UP (${pg.latency_ms} ms)` : 'DOWN'}
+                    </Box>
+                  </Box>
+
+                  <Box sx={{ p: '16px 20px', fontSize: 13, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                    <Box>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                        <Typography sx={{ fontSize: 13, fontWeight: 600 }}>
+                          Connexions Actives vs. <code>max_connections</code>
+                        </Typography>
+                        <Typography sx={{ fontFamily: '"Roboto Mono", monospace', fontSize: 12 }}>
+                          {pg.active_connections} / {pg.max_connections} ({pg.connections_percent.toFixed(1)}%)
+                        </Typography>
+                      </Box>
                       <Box
                         sx={{
-                          height: '100%',
-                          width: `${Math.min(100, Math.max(0, pg.connections_percent))}%`,
-                          bgcolor: pg.connections_percent > 80 ? '#dc2626' : '#1976d2',
+                          width: '100%',
+                          height: 8,
+                          bgcolor: '#e2e8f0',
+                          borderRadius: '4px',
+                          overflow: 'hidden',
                         }}
-                      />
+                      >
+                        <Box
+                          sx={{
+                            height: '100%',
+                            width: `${Math.min(100, Math.max(0, pg.connections_percent))}%`,
+                            bgcolor: pg.connections_percent > 80 ? '#dc2626' : '#1976d2',
+                          }}
+                        />
+                      </Box>
                     </Box>
-                  </Box>
 
-                  <Box
-                    sx={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      borderTop: '1px solid #e2e8f0',
-                      pt: 1.25,
-                    }}
-                  >
-                    <Box component="span">Mida Total Bases de Dades (`pg_database_size`):</Box>
-                    <Box component="strong" sx={{ fontFamily: '"Roboto Mono", monospace', fontSize: 12 }}>
-                      {Math.round(pg.database_size_mb).toLocaleString()} MB (
-                      {(pg.database_size_mb / 1024).toFixed(2)} GB)
-                    </Box>
-                  </Box>
-
-                  <Box
-                    sx={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      borderTop: '1px solid #e2e8f0',
-                      pt: 1.25,
-                    }}
-                  >
-                    <Box component="span">Consultes lentes (&gt; 60s):</Box>
                     <Box
-                      component="strong"
                       sx={{
-                        fontFamily: '"Roboto Mono", monospace',
-                        fontSize: 12,
-                        color: pg.long_running_queries > 0 ? '#dc2626' : '#16a34a',
+                        display: 'grid',
+                        gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' },
+                        gap: 1.5,
+                        pt: 1,
+                        borderTop: '1px solid #e2e8f0',
                       }}
                     >
-                      {pg.long_running_queries}
+                      <Box>
+                        <Typography sx={{ fontSize: 12, color: '#64748b' }}>Mida Total Instància:</Typography>
+                        <Typography sx={{ fontSize: 14, fontWeight: 700, fontFamily: '"Roboto Mono", monospace' }}>
+                          {formatBytesOrMB(pg.database_size_mb)}
+                        </Typography>
+                      </Box>
+                      <Box>
+                        <Typography sx={{ fontSize: 12, color: '#64748b' }}>Bases de Dades Detectades:</Typography>
+                        <Typography sx={{ fontSize: 14, fontWeight: 700 }}>
+                          {pg.databases_count ?? pg.databases?.length ?? 0} bbdd
+                        </Typography>
+                      </Box>
+                      <Box>
+                        <Typography sx={{ fontSize: 12, color: '#64748b' }}>Consultes lentes (&gt; 60s):</Typography>
+                        <Typography
+                          sx={{
+                            fontSize: 14,
+                            fontWeight: 700,
+                            fontFamily: '"Roboto Mono", monospace',
+                            color: pg.long_running_queries > 0 ? '#dc2626' : '#16a34a',
+                          }}
+                        >
+                          {pg.long_running_queries}
+                        </Typography>
+                      </Box>
+                      <Box>
+                        <Typography sx={{ fontSize: 12, color: '#64748b' }}>Locks en espera:</Typography>
+                        <Typography
+                          sx={{
+                            fontSize: 14,
+                            fontWeight: 700,
+                            fontFamily: '"Roboto Mono", monospace',
+                            color: pg.locks_waiting > 0 ? '#dc2626' : '#16a34a',
+                          }}
+                        >
+                          {pg.locks_waiting}
+                        </Typography>
+                      </Box>
                     </Box>
                   </Box>
-
-                  <Box
-                    sx={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      borderTop: '1px solid #e2e8f0',
-                      pt: 1.25,
-                    }}
-                  >
-                    <Box component="span">Locks en espera (`locks_waiting`):</Box>
-                    <Box
-                      component="strong"
-                      sx={{
-                        fontFamily: '"Roboto Mono", monospace',
-                        fontSize: 12,
-                        color: pg.locks_waiting > 0 ? '#dc2626' : '#16a34a',
-                      }}
-                    >
-                      {pg.locks_waiting}
-                    </Box>
-                  </Box>
-                </Box>
-              </Paper>
-            ))
+                </Paper>
+              ))}
+            </Box>
           )}
+
+          {/* TAULA DE BASES DE DADES (AMB MIDA EN MB/GB I PAGINACIÓ) */}
+          <Paper
+            elevation={0}
+            sx={{
+              border: '1px solid #e2e8f0',
+              borderRadius: '10px',
+              overflow: 'hidden',
+            }}
+          >
+            <Box
+              sx={{
+                p: '14px 20px',
+                borderBottom: '1px solid #e2e8f0',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                flexWrap: 'wrap',
+                gap: 1,
+              }}
+            >
+              <Box>
+                <Typography sx={{ fontWeight: 700, fontSize: 15, color: '#1e293b' }}>
+                  Detall de Bases de Dades PostgreSQL (<code>pg_database</code>)
+                </Typography>
+                <Typography sx={{ fontSize: 12, color: '#64748b', mt: 0.25 }}>
+                  {allDatabases.length} bases de dades no-plantilla detectades • Mida acumulada:{' '}
+                  {formatBytesOrMB(totalPostgresSizeMB)}
+                </Typography>
+              </Box>
+            </Box>
+
+            <Box
+              tabIndex={0}
+              role="region"
+              aria-label="Taula de bases de dades PostgreSQL"
+              sx={{ overflowX: 'auto', maxWidth: '100%' }}
+            >
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: 13 }}>
+                <thead style={{ position: 'sticky', top: 0, zIndex: 1 }}>
+                  <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+                    <th
+                      onClick={() => handleDbSort('name')}
+                      style={{
+                        padding: '11px 16px',
+                        fontSize: 11,
+                        fontWeight: 600,
+                        color: '#64748b',
+                        textTransform: 'uppercase',
+                        cursor: 'pointer',
+                        userSelect: 'none',
+                      }}
+                    >
+                      Base de Dades {dbSortBy === 'name' ? (dbSortAsc ? '↑' : '↓') : ''}
+                    </th>
+                    <th style={{ padding: '11px 16px', fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase' }}>
+                      Instància
+                    </th>
+                    <th
+                      onClick={() => handleDbSort('size_mb')}
+                      style={{
+                        padding: '11px 16px',
+                        fontSize: 11,
+                        fontWeight: 600,
+                        color: '#64748b',
+                        textTransform: 'uppercase',
+                        cursor: 'pointer',
+                        userSelect: 'none',
+                      }}
+                    >
+                      Mida (MB) {dbSortBy === 'size_mb' ? (dbSortAsc ? '↑' : '↓') : ''}
+                    </th>
+                    <th style={{ padding: '11px 16px', fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase' }}>
+                      Mida (Formatada)
+                    </th>
+                    <th style={{ padding: '11px 16px', fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase' }}>
+                      % Ocupació a la Instància
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {paginatedDatabases.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} style={{ padding: 24, textAlign: 'center', color: '#64748b' }}>
+                        Cap base de dades individual reportada en aquest snapshot.
+                      </td>
+                    </tr>
+                  ) : (
+                    paginatedDatabases.map((db) => {
+                      const pct =
+                        db.instanceTotalMB > 0
+                          ? Math.min(100, Math.max(0, (db.size_mb / db.instanceTotalMB) * 100))
+                          : 0;
+                      return (
+                        <tr key={`${db.instanceName}-${db.name}`} style={{ borderBottom: '1px solid #e2e8f0' }}>
+                          <td style={{ padding: '12px 16px', fontFamily: '"Roboto Mono", monospace', fontWeight: 700 }}>
+                            {db.name}
+                          </td>
+                          <td style={{ padding: '12px 16px', color: '#64748b' }}>{db.instanceName}</td>
+                          <td style={{ padding: '12px 16px', fontFamily: '"Roboto Mono", monospace', fontSize: 12 }}>
+                            {db.size_mb.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} MB
+                          </td>
+                          <td style={{ padding: '12px 16px', fontFamily: '"Roboto Mono", monospace', fontSize: 12, fontWeight: 600 }}>
+                            {formatBytesOrMB(db.size_mb)}
+                          </td>
+                          <td style={{ padding: '12px 16px' }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                              <Box
+                                sx={{
+                                  width: 100,
+                                  height: 7,
+                                  bgcolor: '#e2e8f0',
+                                  borderRadius: '4px',
+                                  overflow: 'hidden',
+                                }}
+                              >
+                                <Box
+                                  sx={{
+                                    height: '100%',
+                                    width: `${pct}%`,
+                                    bgcolor: '#1976d2',
+                                  }}
+                                />
+                              </Box>
+                              <Typography sx={{ fontSize: 11.5, color: '#64748b', fontFamily: '"Roboto Mono", monospace' }}>
+                                {pct.toFixed(1)}%
+                              </Typography>
+                            </Box>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </Box>
+
+            <TablePagination
+              component="div"
+              count={allDatabases.length}
+              page={dbPage}
+              onPageChange={(_e, newPage) => setDbPage(newPage)}
+              rowsPerPage={dbRowsPerPage}
+              onRowsPerPageChange={(e) => {
+                setDbRowsPerPage(parseInt(e.target.value, 10));
+                setDbPage(0);
+              }}
+              rowsPerPageOptions={[20, 50]}
+              labelRowsPerPage="Files per pàgina:"
+              labelDisplayedRows={({ from, to, count }) => `${from}–${to} de ${count}`}
+            />
+          </Paper>
         </Box>
-      </Box>
+      </TabPanel>
     </Box>
   );
 };

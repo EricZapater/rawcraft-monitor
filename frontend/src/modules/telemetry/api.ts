@@ -6,6 +6,7 @@ export type HostMetricsSnapshot = components['schemas']['HostMetricsSnapshot'];
 export type DockerContainerSnapshot = components['schemas']['DockerContainerSnapshot'];
 export type DockerMetricsSnapshot = components['schemas']['DockerMetricsSnapshot'];
 export type HttpEndpointSnapshot = components['schemas']['HttpEndpointSnapshot'];
+export type PostgresDatabaseInfo = components['schemas']['PostgresDatabaseInfo'];
 export type PostgresInstanceSnapshot = components['schemas']['PostgresInstanceSnapshot'];
 export type ServerDashboardSummary = components['schemas']['ServerDashboardSummary'];
 export type DashboardOverviewResponse = components['schemas']['DashboardOverviewResponse'];

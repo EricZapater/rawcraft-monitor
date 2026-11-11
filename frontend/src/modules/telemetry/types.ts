@@ -182,6 +182,13 @@ export interface components {
             response_time_ms: number;
             error_message?: string | null;
         };
+        PostgresDatabaseInfo: {
+            name: string;
+            /** Format: double */
+            size_mb: number;
+            /** Format: int64 */
+            size_bytes?: number;
+        };
         PostgresInstanceSnapshot: {
             name: string;
             up: boolean;
@@ -192,6 +199,8 @@ export interface components {
             connections_percent: number;
             /** Format: double */
             database_size_mb: number;
+            databases_count?: number;
+            databases?: components["schemas"]["PostgresDatabaseInfo"][];
             long_running_queries: number;
             locks_waiting: number;
             error_message?: string | null;
