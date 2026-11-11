@@ -540,6 +540,22 @@ components:
         total:
           type: integer
 
+    RevealApiKeyRequest:
+      type: object
+      required:
+        - password
+      properties:
+        password:
+          type: string
+
+    RevealApiKeyResponse:
+      type: object
+      required:
+        - api_key
+      properties:
+        api_key:
+          type: string
+
 paths:
   /servers:
     get:
@@ -726,6 +742,46 @@ paths:
                 $ref: '#/components/schemas/RotateApiKeyResponse'
         '403':
           description: Requereix rol ADMIN
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /servers/{id}/reveal-key:
+    post:
+      operationId: revealServerApiKey
+      summary: Valida la contrasenya de l'usuari i retorna l'API Key en clar del servidor per copiar-la
+      tags: [servers]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RevealApiKeyRequest'
+      responses:
+        '200':
+          description: API Key retornada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RevealApiKeyResponse'
+        '401':
+          description: Contrasenya incorrecta
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: No autoritzat sobre aquest servidor
           content:
             application/json:
               schema:

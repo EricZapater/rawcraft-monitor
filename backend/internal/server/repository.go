@@ -12,9 +12,10 @@ import (
 )
 
 var (
-	ErrServerNotFound   = errors.New("servidor no trobat")
-	ErrInvalidServerOp  = errors.New("operació de servidor invàlida")
-	ErrInvalidAgentAuth = errors.New("clau d'agent invàlida")
+	ErrServerNotFound      = errors.New("servidor no trobat")
+	ErrInvalidServerOp     = errors.New("operació de servidor invàlida")
+	ErrInvalidAgentAuth    = errors.New("clau d'agent invàlida")
+	ErrUnauthorizedServer  = errors.New("sense permís per a aquest servidor")
 )
 
 type Repository struct {

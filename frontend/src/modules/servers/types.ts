@@ -58,6 +58,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/servers/{id}/reveal-key": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Valida la contrasenya de l'usuari i retorna l'API Key en clar del servidor per copiar-la */
+        post: operations["revealServerApiKey"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/servers/{id}/config-yaml": {
         parameters: {
             query?: never;
@@ -404,6 +421,12 @@ export interface components {
             items: components["schemas"]["Deployment"][];
             total: number;
         };
+        RevealApiKeyRequest: {
+            password: string;
+        };
+        RevealApiKeyResponse: {
+            api_key: string;
+        };
     };
     responses: never;
     parameters: never;
@@ -629,6 +652,50 @@ export interface operations {
                 };
             };
             /** @description Requereix rol ADMIN */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    revealServerApiKey: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RevealApiKeyRequest"];
+            };
+        };
+        responses: {
+            /** @description API Key retornada */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RevealApiKeyResponse"];
+                };
+            };
+            /** @description Contrasenya incorrecta */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description No autoritzat sobre aquest servidor */
             403: {
                 headers: {
                     [name: string]: unknown;

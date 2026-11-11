@@ -52,6 +52,20 @@ func (s *Service) GetByID(ctx context.Context, id uuid.UUID) (*User, error) {
 	return s.repo.GetByID(ctx, id)
 }
 
+func (s *Service) VerifyUserPassword(ctx context.Context, userID uuid.UUID, password string) error {
+	u, err := s.repo.GetByID(ctx, userID)
+	if err != nil {
+		return ErrInvalidCredential
+	}
+	if !u.IsActive {
+		return ErrInvalidCredential
+	}
+	if err := bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(password)); err != nil {
+		return ErrInvalidCredential
+	}
+	return nil
+}
+
 func (s *Service) List(ctx context.Context) ([]User, error) {
 	return s.repo.List(ctx)
 }

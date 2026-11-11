@@ -197,6 +197,14 @@ type RotateApiKeyResponse struct {
 	APIKey   string    `json:"api_key"`
 }
 
+type RevealApiKeyRequest struct {
+	Password string `json:"password"`
+}
+
+type RevealApiKeyResponse struct {
+	APIKey string `json:"api_key"`
+}
+
 type ServerYamlBundleResponse struct {
 	ServerID        uuid.UUID `json:"server_id"`
 	ServerName      string    `json:"server_name"`

@@ -21,6 +21,8 @@ export type DeploymentStatus = components['schemas']['DeploymentStatus'];
 export type Deployment = components['schemas']['Deployment'];
 export type CreateDeploymentRequest = components['schemas']['CreateDeploymentRequest'];
 export type ListDeploymentsResponse = components['schemas']['ListDeploymentsResponse'];
+export type RevealApiKeyRequest = components['schemas']['RevealApiKeyRequest'];
+export type RevealApiKeyResponse = components['schemas']['RevealApiKeyResponse'];
 
 export const serversApi = {
   async listServers(): Promise<Server[]> {
@@ -79,5 +81,13 @@ export const serversApi = {
       payload
     );
     return data;
+  },
+
+  async revealServerApiKey(serverId: string, password: string): Promise<string> {
+    const { data } = await apiClient.post<RevealApiKeyResponse>(
+      `/servers/${serverId}/reveal-key`,
+      { password }
+    );
+    return data.api_key;
   },
 };

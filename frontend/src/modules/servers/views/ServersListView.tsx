@@ -16,6 +16,7 @@ import {
 import { useServersStore } from '../store';
 import type { Server } from '../api';
 import { useUsersStore } from '../../users/store';
+import { CopyApiKeyDialog } from '../components/CopyApiKeyDialog';
 
 export const ServersListView: React.FC = () => {
   const navigate = useNavigate();
@@ -57,6 +58,7 @@ export const ServersListView: React.FC = () => {
 
   const [deleteTarget, setDeleteTarget] = useState<Server | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [copyTarget, setCopyTarget] = useState<Server | null>(null);
 
   const nameId = useId();
   const descId = useId();
@@ -318,10 +320,36 @@ sudo systemctl status rawcraft-agent`;
                             fontSize: 12,
                             color: '#64748b',
                             mt: 0.25,
+                            display: 'flex',
+                            alignItems: 'center',
+                            flexWrap: 'wrap',
+                            gap: 0.5,
                           }}
                         >
-                          id: {srv.id}
-                          {srv.api_key_preview ? ` • key: ${srv.api_key_preview}` : ''}
+                          <span>id: {srv.id}</span>
+                          {srv.api_key_preview && (
+                            <>
+                              <span>• key: {srv.api_key_preview}</span>
+                              <Button
+                                size="small"
+                                onClick={() => setCopyTarget(srv)}
+                                sx={{
+                                  textTransform: 'none',
+                                  fontSize: 11,
+                                  py: 0,
+                                  px: 0.75,
+                                  minWidth: 0,
+                                  color: '#1976d2',
+                                  bgcolor: '#f1f5f9',
+                                  border: '1px solid #cbd5e1',
+                                  borderRadius: '4px',
+                                  lineHeight: 1.4,
+                                }}
+                              >
+                                🔒 Copiar Key
+                              </Button>
+                            </>
+                          )}
                         </Typography>
                       </td>
                       <td style={{ padding: '16px 18px' }}>
@@ -448,6 +476,20 @@ sudo systemctl status rawcraft-agent`;
                             }}
                           >
                             Configurar 4 Potetes &amp; YAML
+                          </Button>
+                          <Button
+                            variant="outlined"
+                            size="small"
+                            onClick={() => setCopyTarget(srv)}
+                            sx={{
+                              textTransform: 'none',
+                              borderColor: '#e2e8f0',
+                              color: '#1e293b',
+                              fontSize: 13,
+                              fontWeight: 500,
+                            }}
+                          >
+                            🔒 Copiar API Key
                           </Button>
                           {isAdmin && (
                             <>
@@ -901,6 +943,14 @@ sudo systemctl status rawcraft-agent`;
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Modal Protegit per Copiar l'API Key */}
+      <CopyApiKeyDialog
+        open={Boolean(copyTarget)}
+        onClose={() => setCopyTarget(null)}
+        serverId={copyTarget?.id || ''}
+        serverName={copyTarget?.name}
+      />
     </Box>
   );
 };

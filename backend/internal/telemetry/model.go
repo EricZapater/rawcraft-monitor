@@ -41,6 +41,7 @@ type DockerContainerSnapshot struct {
 	ContainerID   string  `json:"container_id"`
 	Name          string  `json:"name"`
 	Image         string  `json:"image"`
+	ImageSizeMB   float64 `json:"image_size_mb,omitempty"`
 	State         string  `json:"state"`
 	Status        string  `json:"status"`
 	Health        string  `json:"health"`
@@ -56,6 +57,7 @@ type DockerMetricsSnapshot struct {
 	TotalHostContainers   int                       `json:"total_host_containers"`
 	RunningHostContainers int                       `json:"running_host_containers"`
 	StoppedHostContainers int                       `json:"stopped_host_containers"`
+	TotalImagesSizeMB     float64                   `json:"total_images_size_mb,omitempty"`
 	Containers            []DockerContainerSnapshot `json:"containers"`
 }
 

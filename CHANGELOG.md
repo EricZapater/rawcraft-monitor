@@ -5,6 +5,23 @@ Tots els canvis rellevants d'aquest projecte es documenten en aquest fitxer.
 El format es basa en [Keep a Changelog](https://keepachangelog.com/ca/1.0.0/),
 i aquest projecte segueix [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2026-11-11
+
+### Added
+- **Còpia Segura d'API Key amb Verificació de Contrasenya**:
+  - Nou endpoint `POST /api/v1/servers/:id/reveal-key` protegit amb JWT i validació de la contrasenya de l'usuari actual via bcrypt (`VerifyUserPassword`).
+  - Actualitzats els contractes OpenAPI ([`server.openapi.yaml`](contracts/server.openapi.yaml)) i el client API TypeScript.
+  - Component [`CopyApiKeyDialog.tsx`](frontend/src/modules/servers/components/CopyApiKeyDialog.tsx) que sol·licita la contrasenya d'usuari i copia la clau directament al porta-retalls mitjançant `navigator.clipboard.writeText`, sense mostrar mai la clau en text clar a la pantalla.
+  - Botó d'acció "🔒 Copiar API Key" integrat tant a la barra d'eines de [`ServerDetailView.tsx`](frontend/src/modules/telemetry/views/ServerDetailView.tsx) com a la taula de servidors [`ServersListView.tsx`](frontend/src/modules/servers/views/ServersListView.tsx).
+- **Mida a Disc de les Imatges Docker (Espai Ocupat)**:
+  - L'agent ([`collector_docker.go`](backend/internal/agent/collector_docker.go)) inspecciona les imatges locals a través de l'API de Docker Engine (`/images/json`) per calcular:
+    - `image_size_mb`: Mida virtual a disc de la imatge de cada contenidor en MB.
+    - `total_images_size_mb`: Suma acumulada de l'espai en disc ocupat per totes les imatges Docker locals del host.
+  - Contracte OpenAPI ([`telemetry.openapi.yaml`](contracts/telemetry.openapi.yaml)), models Go i tipus TypeScript actualitzats amb `image_size_mb` i `total_images_size_mb`.
+  - A la pestanya **🐳 Dockers** de [`ServerDetailView.tsx`](frontend/src/modules/telemetry/views/ServerDetailView.tsx):
+    - Subtítol amb el total d'espai d'imatges a disc (`📦 Espai imatges a disc: X GB/MB`).
+    - Nova columna a la taula amb la mida de la imatge de cada contenidor, amb suport per ordenar la taula per mida d'imatge (`image_size_mb`).
+
 ## [0.1.9] - 2026-11-11
 
 ### Added

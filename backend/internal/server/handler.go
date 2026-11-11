@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 
 	"rawcraft-monitor/backend/internal/shared"
+	"rawcraft-monitor/backend/internal/user"
 )
 
 type Handler struct {
@@ -37,6 +38,7 @@ func (h *Handler) RegisterRoutes(v1 *gin.RouterGroup) {
 		srvGroup.GET("", h.ListServers)
 		srvGroup.GET("/:id", h.GetServerByID)
 		srvGroup.GET("/:id/deploys", h.ListServerDeployments)
+		srvGroup.POST("/:id/reveal-key", h.RevealAPIKey)
 
 		// Rutes d'administració (només ADMIN)
 		adminOnly := srvGroup.Group("")
@@ -419,5 +421,45 @@ func (h *Handler) ListServerDeployments(c *gin.Context) {
 	c.JSON(http.StatusOK, ListDeploymentsResponse{
 		Items: items,
 		Total: total,
+	})
+}
+
+func (h *Handler) RevealAPIKey(c *gin.Context) {
+	idStr := c.Param("id")
+	serverID, err := uuid.Parse(idStr)
+	if err != nil {
+		shared.RespondError(c, http.StatusBadRequest, "INVALID_SERVER_ID", "ID de servidor invàlid")
+		return
+	}
+
+	userID, ok := shared.GetAuthUserID(c)
+	if !ok {
+		shared.RespondError(c, http.StatusUnauthorized, "UNAUTHORIZED", "Sessió no vàlida")
+		return
+	}
+	role := shared.GetAuthUserRole(c)
+
+	var req RevealApiKeyRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		shared.RespondError(c, http.StatusBadRequest, "INVALID_PAYLOAD", "Format de petició invàlid")
+		return
+	}
+
+	apiKey, err := h.service.RevealAPIKey(c.Request.Context(), userID, role, serverID, req.Password)
+	if err != nil {
+		if errors.Is(err, user.ErrInvalidCredential) {
+			shared.RespondError(c, http.StatusUnauthorized, "INVALID_PASSWORD", "Contrasenya incorrecta")
+			return
+		}
+		if errors.Is(err, ErrUnauthorizedServer) {
+			shared.RespondError(c, http.StatusForbidden, "FORBIDDEN", "No tens permisos per consultar aquest servidor")
+			return
+		}
+		shared.RespondError(c, http.StatusBadRequest, "ERROR", err.Error())
+		return
+	}
+
+	c.JSON(http.StatusOK, RevealApiKeyResponse{
+		APIKey: apiKey,
 	})
 }

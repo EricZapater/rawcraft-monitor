@@ -18,6 +18,7 @@ import {
 } from '@mui/material';
 import { useTelemetryStore } from '../store';
 import { serversApi, type Deployment } from '../../servers/api';
+import { CopyApiKeyDialog } from '../../servers/components/CopyApiKeyDialog';
 import type {
   DockerContainerSnapshot,
   HttpEndpointSnapshot,
@@ -25,7 +26,7 @@ import type {
   PostgresInstanceSnapshot,
 } from '../api';
 
-type DockerSortField = 'name' | 'cpu_percent' | 'memory_percent';
+type DockerSortField = 'name' | 'cpu_percent' | 'memory_percent' | 'image_size_mb';
 type DbSortField = 'name' | 'size_mb';
 
 interface FlattenedDatabaseItem extends PostgresDatabaseInfo {
@@ -113,6 +114,7 @@ export const ServerDetailView: React.FC = () => {
   const [deployRowsPerPage, setDeployRowsPerPage] = useState<number>(20);
   const [actionsModalOpen, setActionsModalOpen] = useState<boolean>(false);
   const [copySnackbar, setCopySnackbar] = useState<boolean>(false);
+  const [copyKeyOpen, setCopyKeyOpen] = useState<boolean>(false);
 
   const fetchDeployments = useCallback(async () => {
     if (!id) return;
@@ -147,7 +149,7 @@ export const ServerDetailView: React.FC = () => {
       if (dockerSortBy === 'name') {
         return a.name.localeCompare(b.name) * mul;
       }
-      return (a[dockerSortBy] - b[dockerSortBy]) * mul;
+      return (((a[dockerSortBy] as number | undefined) ?? 0) - ((b[dockerSortBy] as number | undefined) ?? 0)) * mul;
     });
     return list;
   }, [liveDetail?.docker?.containers, dockerSortBy, dockerSortAsc]);
@@ -296,6 +298,14 @@ export const ServerDetailView: React.FC = () => {
           <Typography sx={{ fontSize: 12, color: '#64748b' }}>
             Actualitzat: {liveDetail?.recorded_at ? new Date(liveDetail.recorded_at).toLocaleTimeString() : 'N/A'}
           </Typography>
+          <Button
+            variant="outlined"
+            size="small"
+            onClick={() => setCopyKeyOpen(true)}
+            sx={{ textTransform: 'none', borderColor: '#e2e8f0', color: '#1e293b', fontWeight: 600 }}
+          >
+            🔒 Copiar API Key
+          </Button>
           {id && (
             <Button
               component={RouterLink}
@@ -535,6 +545,9 @@ export const ServerDetailView: React.FC = () => {
                 {liveDetail?.docker?.total_host_containers ?? sortedContainers.length} (
                 {liveDetail?.docker?.running_host_containers ?? sortedContainers.length} actius,{' '}
                 {liveDetail?.docker?.stopped_host_containers ?? 0} aturats)
+                {typeof liveDetail?.docker?.total_images_size_mb === 'number' && (
+                  <> • 📦 Espai imatges a disc: <strong>{formatBytesOrMB(liveDetail.docker.total_images_size_mb)}</strong></>
+                )}
               </Typography>
             </Box>
             <Typography
@@ -609,12 +622,26 @@ export const ServerDetailView: React.FC = () => {
                   >
                     Memòria RAM (MB / Límit / %) {dockerSortBy === 'memory_percent' ? (dockerSortAsc ? '↑' : '↓') : ''}
                   </th>
+                  <th
+                    onClick={() => handleDockerSort('image_size_mb')}
+                    style={{
+                      padding: '11px 16px',
+                      fontSize: 11,
+                      fontWeight: 600,
+                      color: '#64748b',
+                      textTransform: 'uppercase',
+                      cursor: 'pointer',
+                      userSelect: 'none',
+                    }}
+                  >
+                    Mida Imatge {dockerSortBy === 'image_size_mb' ? (dockerSortAsc ? '↑' : '↓') : ''}
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {paginatedContainers.length === 0 ? (
                   <tr>
-                    <td colSpan={6} style={{ padding: 24, textAlign: 'center', color: '#64748b' }}>
+                    <td colSpan={7} style={{ padding: 24, textAlign: 'center', color: '#64748b' }}>
                       Cap contenidor reportat en aquest snapshot.
                     </td>
                   </tr>
@@ -676,6 +703,9 @@ export const ServerDetailView: React.FC = () => {
                           </Box>
                           {Math.round(c.memory_used_mb)} MB / {Math.round(c.memory_limit_mb)} MB (
                           {c.memory_percent.toFixed(1)}%)
+                        </td>
+                        <td style={{ padding: '12px 16px', fontFamily: '"Roboto Mono", monospace', fontSize: 12 }}>
+                          {c.image_size_mb ? formatBytesOrMB(c.image_size_mb) : '—'}
                         </td>
                       </tr>
                     );
@@ -1496,6 +1526,14 @@ export const ServerDetailView: React.FC = () => {
         autoHideDuration={3000}
         onClose={() => setCopySnackbar(false)}
         message="Snippet de GitHub Actions copiat al porta-retalls!"
+      />
+
+      {/* DIÀLEG COPIAR API KEY PROTEGIT PER CONTRASENYA */}
+      <CopyApiKeyDialog
+        open={copyKeyOpen}
+        onClose={() => setCopyKeyOpen(false)}
+        serverId={id || ''}
+        serverName={liveDetail?.server_name}
       />
     </Box>
   );

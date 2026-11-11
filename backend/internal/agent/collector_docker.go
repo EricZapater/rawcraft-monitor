@@ -16,11 +16,19 @@ import (
 )
 
 type dockerContainerListItem struct {
-	ID     string   `json:"Id"`
-	Names  []string `json:"Names"`
-	Image  string   `json:"Image"`
-	State  string   `json:"State"`
-	Status string   `json:"Status"`
+	ID      string   `json:"Id"`
+	Names   []string `json:"Names"`
+	Image   string   `json:"Image"`
+	ImageID string   `json:"ImageID"`
+	State   string   `json:"State"`
+	Status  string   `json:"Status"`
+}
+
+type dockerImageListItem struct {
+	ID          string   `json:"Id"`
+	RepoTags    []string `json:"RepoTags"`
+	Size        int64    `json:"Size"`
+	VirtualSize int64    `json:"VirtualSize"`
 }
 
 type dockerStatsPayload struct {
@@ -100,6 +108,43 @@ func CollectDockerMetrics(ctx context.Context, cfg server.DockerPillarConfig) *t
 		return &telemetry.DockerMetricsSnapshot{DockerDaemonUp: true, Containers: []telemetry.DockerContainerSnapshot{}}
 	}
 
+	// 3. Llistar imatges Docker (/images/json) per calcular la mida en disc
+	imageSizes := make(map[string]float64)
+	var totalImagesBytes int64
+	imgReq, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://localhost/images/json", nil)
+	if err == nil {
+		imgResp, err := client.Do(imgReq)
+		if err == nil {
+			var rawImages []dockerImageListItem
+			if err := json.NewDecoder(imgResp.Body).Decode(&rawImages); err == nil {
+				for _, img := range rawImages {
+					sz := img.Size
+					if sz <= 0 && img.VirtualSize > 0 {
+						sz = img.VirtualSize
+					}
+					mb := round2(float64(sz) / (1024.0 * 1024.0))
+					totalImagesBytes += sz
+					if img.ID != "" {
+						imageSizes[img.ID] = mb
+						cleanID := strings.TrimPrefix(img.ID, "sha256:")
+						if len(cleanID) > 12 {
+							imageSizes[cleanID[:12]] = mb
+						}
+					}
+					for _, tag := range img.RepoTags {
+						imageSizes[tag] = mb
+						// També sense tag :latest si escau
+						if strings.HasSuffix(tag, ":latest") {
+							imageSizes[strings.TrimSuffix(tag, ":latest")] = mb
+						}
+					}
+				}
+			}
+			_ = imgResp.Body.Close()
+		}
+	}
+	totalImagesMB := round2(float64(totalImagesBytes) / (1024.0 * 1024.0))
+
 	totalHost := len(rawContainers)
 	runningHost := 0
 	stoppedHost := 0
@@ -124,6 +169,22 @@ func CollectDockerMetrics(ctx context.Context, cfg server.DockerPillarConfig) *t
 
 	snapshots := make([]telemetry.DockerContainerSnapshot, 0)
 
+	getImageSize := func(rc dockerContainerListItem) float64 {
+		if sz, ok := imageSizes[rc.Image]; ok && sz > 0 {
+			return sz
+		}
+		if sz, ok := imageSizes[rc.ImageID]; ok && sz > 0 {
+			return sz
+		}
+		cleanID := strings.TrimPrefix(rc.ImageID, "sha256:")
+		if len(cleanID) > 12 {
+			if sz, ok := imageSizes[cleanID[:12]]; ok && sz > 0 {
+				return sz
+			}
+		}
+		return 0
+	}
+
 	if len(cfg.RequiredContainers) > 0 {
 		// LLISTA BLANCA: només monitoritzem els contenidors de required_containers
 		for _, reqName := range cfg.RequiredContainers {
@@ -144,6 +205,7 @@ func CollectDockerMetrics(ctx context.Context, cfg server.DockerPillarConfig) *t
 					ContainerID: shortID,
 					Name:        cleanReq,
 					Image:       rc.Image,
+					ImageSizeMB: getImageSize(rc),
 					State:       state,
 					Status:      rc.Status,
 					Health:      health,
@@ -184,6 +246,7 @@ func CollectDockerMetrics(ctx context.Context, cfg server.DockerPillarConfig) *t
 				ContainerID: shortID,
 				Name:        name,
 				Image:       rc.Image,
+				ImageSizeMB: getImageSize(rc),
 				State:       state,
 				Status:      rc.Status,
 				Health:      health,
@@ -236,6 +299,7 @@ func CollectDockerMetrics(ctx context.Context, cfg server.DockerPillarConfig) *t
 		TotalHostContainers:   totalHost,
 		RunningHostContainers: runningHost,
 		StoppedHostContainers: stoppedHost,
+		TotalImagesSizeMB:     totalImagesMB,
 		Containers:            snapshots,
 	}
 }

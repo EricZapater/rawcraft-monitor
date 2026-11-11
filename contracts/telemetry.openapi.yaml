@@ -168,6 +168,9 @@ components:
         memory_percent:
           type: number
           format: double
+        image_size_mb:
+          type: number
+          format: double
 
     DockerMetricsSnapshot:
       type: object
@@ -183,6 +186,9 @@ components:
           type: integer
         stopped_host_containers:
           type: integer
+        total_images_size_mb:
+          type: number
+          format: double
         containers:
           type: array
           items:

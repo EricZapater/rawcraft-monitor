@@ -173,6 +173,26 @@ func (s *Service) RotateAPIKey(ctx context.Context, serverID uuid.UUID) (*Rotate
 	}, nil
 }
 
+func (s *Service) RevealAPIKey(ctx context.Context, userID uuid.UUID, role string, serverID uuid.UUID, password string) (string, error) {
+	if strings.TrimSpace(password) == "" {
+		return "", errors.New("cal introduir la contrasenya")
+	}
+	if err := s.userService.VerifyUserPassword(ctx, userID, password); err != nil {
+		return "", err
+	}
+	srv, allowed, err := s.GetAuthorizedByID(ctx, userID, role, serverID)
+	if err != nil {
+		return "", err
+	}
+	if !allowed || srv == nil {
+		return "", ErrUnauthorizedServer
+	}
+	if srv.APIKeyPlain == "" {
+		return "", errors.New("clau API no disponible")
+	}
+	return srv.APIKeyPlain, nil
+}
+
 func (s *Service) UpdateTelemetryMetadata(
 	ctx context.Context,
 	serverID uuid.UUID,

@@ -164,12 +164,16 @@ export interface components {
             memory_limit_mb: number;
             /** Format: double */
             memory_percent: number;
+            /** Format: double */
+            image_size_mb?: number;
         };
         DockerMetricsSnapshot: {
             docker_daemon_up: boolean;
             total_host_containers?: number;
             running_host_containers?: number;
             stopped_host_containers?: number;
+            /** Format: double */
+            total_images_size_mb?: number;
             containers: components["schemas"]["DockerContainerSnapshot"][];
         };
         HttpEndpointSnapshot: {
