@@ -1,0 +1,40 @@
+mockups/alert/alerts.html
+  h_42175f19913982 1-324
+mockups/approvals.md
+  h_42175f19913982 1-12
+mockups/server/server-config-yaml.html
+  h_42175f19913982 1-494
+mockups/server/servers-list.html
+  h_42175f19913982 1-383
+mockups/telemetry/dashboard.html
+  h_42175f19913982 1-462
+mockups/telemetry/server-detail.html
+  h_42175f19913982 1-417
+mockups/telemetry/server-history.html
+  h_42175f19913982 1-277
+mockups/user/login.html
+  h_42175f19913982 1-300
+mockups/user/users.html
+  h_42175f19913982 1-527
+specs/alert.md
+  h_42175f19913982 1-50
+specs/infra.md
+  h_42175f19913982 1-68
+specs/server.md
+  h_42175f19913982 1-56
+specs/telemetry.md
+  h_42175f19913982 1-86
+specs/user.md
+  h_42175f19913982 1-57
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "3b0a3ff36cf5d7143c031c213d870c1a44bd0b15",
+  "prompts": {},
+  "humans": {
+    "h_42175f19913982": {
+      "author": "Èric Zapater <ericzm@ext.inditex.com>"
+    }
+  }
+}
