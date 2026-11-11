@@ -5,6 +5,17 @@ Tots els canvis rellevants d'aquest projecte es documenten en aquest fitxer.
 El format es basa en [Keep a Changelog](https://keepachangelog.com/ca/1.0.0/),
 i aquest projecte segueix [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.9] - 2026-11-11
+
+### Added
+- **Eixos X/Y, Llegenda i Correlació de Desplegaments a les Gràfiques Temporals**:
+  - A [`ServerHistoryView.tsx`](frontend/src/modules/telemetry/views/ServerHistoryView.tsx), s'ha redissenyat completament el motor de renderitzat SVG (`MetricChartCard`):
+    - **Eix Y**: Escala vertical amb valors i unitats adaptatives (`%`, `Load`, `MB`, `ms`) i quadrícula de línies de guia.
+    - **Eix X**: Escala temporal amb marques de temps formatades (`HH:mm` per a 6h/24h, `DD/MM` per a rangs de dies).
+    - **Llegenda**: Resum visual de cada mètrica amb el seu codi de color, valors actuals i línies de llindar d'alerta.
+    - **Marcadors de Desplegament**: Dibuix de línies verticals morades amb icona 🚀 a les pròpies gràfiques temporals en el moment exacte en què s'ha produït un deploy.
+    - **Timeline de Desplegaments**: Panell cronològic sota les gràfiques que detalla els canvis de codi que han tingut lloc dins de la finestra temporal seleccionada.
+
 ## [0.1.8] - 2026-11-11
 
 ### Added

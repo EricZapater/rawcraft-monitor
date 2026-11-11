@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useId } from 'react';
+import React, { useEffect, useState, useId, useMemo } from 'react';
 import { useParams, Link as RouterLink } from 'react-router-dom';
 import {
   Box,
@@ -13,6 +13,7 @@ import {
   CircularProgress,
 } from '@mui/material';
 import { useTelemetryStore } from '../store';
+import { serversApi, type Deployment } from '../../servers/api';
 import type { HistoryRange, TelemetryHistoryPoint } from '../api';
 import { useUsersStore } from '../../users/store';
 
@@ -24,22 +25,322 @@ const RANGES: { value: HistoryRange; label: string }[] = [
   { value: '365d', label: '365 dies' },
 ];
 
-function buildSvgPolyline(values: number[], maxVal: number, width = 500, height = 140): string {
-  if (values.length === 0) return `0,${height - 15} ${width},${height - 15}`;
-  const safeMax = maxVal > 0 ? maxVal : 1;
-  if (values.length === 1) {
-    const y = Math.round(height - 12 - (Math.min(values[0], safeMax) / safeMax) * (height - 28));
-    return `0,${y} ${width},${y}`;
-  }
-  return values
-    .map((val, idx) => {
-      const x = Math.round((idx / (values.length - 1)) * width);
-      const clamped = Math.max(0, Math.min(val, safeMax));
-      const y = Math.round(height - 12 - (clamped / safeMax) * (height - 28));
-      return `${x},${y}`;
-    })
-    .join(' ');
+interface ChartSeries {
+  name: string;
+  color: string;
+  values: number[];
+  strokeWidth?: number;
+  strokeDasharray?: string;
 }
+
+interface MetricChartCardProps {
+  title: string;
+  points: TelemetryHistoryPoint[];
+  range: HistoryRange;
+  yMax: number;
+  yUnit: string;
+  series: ChartSeries[];
+  deployments?: Deployment[];
+  alertThreshold?: { value: number; label: string };
+  currentSummary?: React.ReactNode;
+}
+
+function formatRelativeTime(dateStr: string): string {
+  try {
+    const diffMs = Date.now() - new Date(dateStr).getTime();
+    const diffSec = Math.floor(diffMs / 1000);
+    if (diffSec < 60) return `fa ${diffSec}s`;
+    const diffMin = Math.floor(diffSec / 60);
+    if (diffMin < 60) return `fa ${diffMin}m`;
+    const diffHours = Math.floor(diffMin / 60);
+    if (diffHours < 24) return `fa ${diffHours}h`;
+    const diffDays = Math.floor(diffHours / 24);
+    return `fa ${diffDays}d`;
+  } catch {
+    return dateStr;
+  }
+}
+
+function formatTickDate(date: Date, range: HistoryRange): string {
+  if (range === '6h' || range === '24h') {
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+  if (range === '7d' || range === '30d') {
+    return `${date.getDate()}/${date.getMonth() + 1} ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+  }
+  return `${date.getDate()}/${date.getMonth() + 1}`;
+}
+
+const MetricChartCard: React.FC<MetricChartCardProps> = ({
+  title,
+  points,
+  range,
+  yMax,
+  yUnit,
+  series,
+  deployments = [],
+  alertThreshold,
+  currentSummary,
+}) => {
+  const width = 560;
+  const height = 190;
+  const margin = { top: 22, right: 20, bottom: 34, left: 45 };
+  const plotWidth = width - margin.left - margin.right;
+  const plotHeight = height - margin.top - margin.bottom;
+
+  const safeYMax = yMax > 0 ? yMax : 1;
+
+  // Càlcul de timestamps inici i final
+  const { startTime, endTime, timeRangeValid } = useMemo(() => {
+    if (points.length < 2) {
+      return { startTime: 0, endTime: 0, timeRangeValid: false };
+    }
+    const st = new Date(points[0].timestamp).getTime();
+    const et = new Date(points[points.length - 1].timestamp).getTime();
+    return { startTime: st, endTime: et, timeRangeValid: et > st };
+  }, [points]);
+
+  // Desplegaments dins d'aquesta finestra temporal
+  const activeDeployments = useMemo(() => {
+    if (!timeRangeValid || deployments.length === 0) return [];
+    return deployments
+      .filter((d) => {
+        const t = new Date(d.deployed_at).getTime();
+        return t >= startTime && t <= endTime;
+      })
+      .map((d) => {
+        const t = new Date(d.deployed_at).getTime();
+        const pct = (t - startTime) / (endTime - startTime);
+        return {
+          ...d,
+          pct: Math.max(0, Math.min(1, pct)),
+          x: margin.left + Math.round(pct * plotWidth),
+        };
+      });
+  }, [deployments, startTime, endTime, timeRangeValid, plotWidth, margin.left]);
+
+  // Línies i etiquetes de l'Eix Y
+  const yTicks = useMemo(() => {
+    const fractions = [1.0, 0.66, 0.33, 0.0];
+    return fractions.map((f) => {
+      const val = safeYMax * f;
+      const y = margin.top + Math.round((1 - f) * plotHeight);
+      let label = `${Math.round(val)}`;
+      if (yUnit === '%') {
+        label = `${Math.round(val)}%`;
+      } else if (yUnit === 'Load') {
+        label = val.toFixed(1);
+      } else if (yUnit === 'MB') {
+        label = `${Math.round(val)}M`;
+      } else if (yUnit === 'ms') {
+        label = `${Math.round(val)}ms`;
+      }
+      return { val, y, label };
+    });
+  }, [safeYMax, plotHeight, margin.top, yUnit]);
+
+  // Etiquetes de l'Eix X
+  const xTicks = useMemo(() => {
+    if (!timeRangeValid) return [];
+    const ticksCount = 4;
+    const ticks: { x: number; label: string; textAnchor: 'start' | 'middle' | 'end' }[] = [];
+    for (let i = 0; i < ticksCount; i++) {
+      const pct = i / (ticksCount - 1);
+      const t = startTime + pct * (endTime - startTime);
+      const x = margin.left + Math.round(pct * plotWidth);
+      const d = new Date(t);
+      const textAnchor = i === 0 ? 'start' : i === ticksCount - 1 ? 'end' : 'middle';
+      ticks.push({
+        x,
+        label: formatTickDate(d, range),
+        textAnchor,
+      });
+    }
+    return ticks;
+  }, [timeRangeValid, startTime, endTime, margin.left, plotWidth, range]);
+
+  // Convertir sèries a polylines
+  const polylinePoints = (values: number[]) => {
+    if (values.length === 0) return '';
+    if (values.length === 1) {
+      const val = Math.max(0, Math.min(values[0], safeYMax));
+      const y = margin.top + Math.round(plotHeight - (val / safeYMax) * plotHeight);
+      return `${margin.left},${y} ${margin.left + plotWidth},${y}`;
+    }
+    return values
+      .map((val, idx) => {
+        const x = margin.left + Math.round((idx / (values.length - 1)) * plotWidth);
+        const clamped = Math.max(0, Math.min(val, safeYMax));
+        const y = margin.top + Math.round(plotHeight - (clamped / safeYMax) * plotHeight);
+        return `${x},${y}`;
+      })
+      .join(' ');
+  };
+
+  // Posició de la línia de llindar
+  const thresholdY = alertThreshold
+    ? margin.top + Math.round(plotHeight - (Math.min(alertThreshold.value, safeYMax) / safeYMax) * plotHeight)
+    : null;
+
+  return (
+    <Paper elevation={0} sx={{ border: '1px solid #e2e8f0', borderRadius: '10px', p: '16px 20px' }}>
+      {/* Capçalera de la gràfica */}
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5, flexWrap: 'wrap', gap: 1 }}>
+        <Typography sx={{ fontSize: 14, fontWeight: 700, color: '#1e293b' }}>
+          {title}
+        </Typography>
+        {currentSummary && (
+          <Typography sx={{ fontSize: 12.5, color: '#64748b', fontFamily: '"Roboto Mono", monospace' }}>
+            {currentSummary}
+          </Typography>
+        )}
+      </Box>
+
+      {/* Llegenda */}
+      <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 2, mb: 1.5, fontSize: 12 }}>
+        {series.map((s) => (
+          <Box key={s.name} sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+            <Box
+              sx={{
+                width: 12,
+                height: 3,
+                bgcolor: s.color,
+                borderRadius: '2px',
+                borderStyle: s.strokeDasharray ? 'dashed' : 'solid',
+              }}
+            />
+            <Typography sx={{ fontSize: 12, color: '#475569', fontWeight: 500 }}>
+              {s.name}
+            </Typography>
+          </Box>
+        ))}
+
+        {alertThreshold && (
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+            <Box sx={{ width: 12, height: 2, borderBottom: '2px dashed #f87171' }} />
+            <Typography sx={{ fontSize: 12, color: '#dc2626', fontWeight: 500 }}>
+              {alertThreshold.label}
+            </Typography>
+          </Box>
+        )}
+
+        {activeDeployments.length > 0 && (
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+            <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: '#8b5cf6' }} />
+            <Typography sx={{ fontSize: 12, color: '#7c3aed', fontWeight: 600 }}>
+              🚀 Desplegament ({activeDeployments.length})
+            </Typography>
+          </Box>
+        )}
+      </Box>
+
+      {/* SVG Canvas amb Eixos i Sèries */}
+      <svg
+        viewBox={`0 0 ${width} ${height}`}
+        style={{
+          width: '100%',
+          height: 'auto',
+          background: '#f8fafc',
+          borderRadius: 8,
+          border: '1px solid #e2e8f0',
+          display: 'block',
+        }}
+      >
+        {/* Línies de fons i etiquetes de l'Eix Y */}
+        {yTicks.map((t, idx) => (
+          <g key={idx}>
+            <line
+              x1={margin.left}
+              y1={t.y}
+              x2={margin.left + plotWidth}
+              y2={t.y}
+              stroke="#e2e8f0"
+              strokeDasharray={idx === yTicks.length - 1 ? 'none' : '3 3'}
+              strokeWidth="1"
+            />
+            <text
+              x={margin.left - 8}
+              y={t.y + 3.5}
+              textAnchor="end"
+              fill="#64748b"
+              fontSize="10"
+              fontFamily='"Roboto Mono", monospace'
+            >
+              {t.label}
+            </text>
+          </g>
+        ))}
+
+        {/* Línia de Llindar d'Alerta */}
+        {thresholdY !== null && (
+          <line
+            x1={margin.left}
+            y1={thresholdY}
+            x2={margin.left + plotWidth}
+            y2={thresholdY}
+            stroke="#fca5a5"
+            strokeDasharray="4 4"
+            strokeWidth="1.5"
+          />
+        )}
+
+        {/* Marcador vertical de desplegaments (Deploy Timeline Markers) */}
+        {activeDeployments.map((d) => (
+          <g key={d.id}>
+            <line
+              x1={d.x}
+              y1={margin.top}
+              x2={d.x}
+              y2={margin.top + plotHeight}
+              stroke="#8b5cf6"
+              strokeWidth="1.75"
+              strokeDasharray="4 2"
+            />
+            <circle cx={d.x} cy={margin.top} r="4.5" fill="#8b5cf6" stroke="#ffffff" strokeWidth="1.5">
+              <title>{`🚀 Desplegament: ${d.product_name} (${d.version}) - ${new Date(d.deployed_at).toLocaleTimeString()}`}</title>
+            </circle>
+          </g>
+        ))}
+
+        {/* Sèries Temporals */}
+        {series.map((s) => (
+          <polyline
+            key={s.name}
+            fill="none"
+            stroke={s.color}
+            strokeWidth={s.strokeWidth ?? 2}
+            strokeDasharray={s.strokeDasharray}
+            points={polylinePoints(s.values)}
+          />
+        ))}
+
+        {/* Eix X: Línia base i etiquetes temporals */}
+        <line
+          x1={margin.left}
+          y1={margin.top + plotHeight}
+          x2={margin.left + plotWidth}
+          y2={margin.top + plotHeight}
+          stroke="#cbd5e1"
+          strokeWidth="1"
+        />
+
+        {xTicks.map((xt, idx) => (
+          <text
+            key={idx}
+            x={xt.x}
+            y={margin.top + plotHeight + 18}
+            textAnchor={xt.textAnchor}
+            fill="#64748b"
+            fontSize="10"
+            fontFamily='"Roboto Mono", monospace'
+          >
+            {xt.label}
+          </text>
+        ))}
+      </svg>
+    </Paper>
+  );
+};
 
 export const ServerHistoryView: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -63,6 +364,9 @@ export const ServerHistoryView: React.FC = () => {
   const [savingRetention, setSavingRetention] = useState(false);
   const retentionInputId = useId();
 
+  // Desplegaments per correlacionar amb les mètriques
+  const [deployments, setDeployments] = useState<Deployment[]>([]);
+
   useEffect(() => {
     void fetchRetention();
   }, [fetchRetention]);
@@ -76,6 +380,14 @@ export const ServerHistoryView: React.FC = () => {
   useEffect(() => {
     if (!id) return;
     void fetchHistory(id, range);
+
+    // Carregar desplegaments recents per a la correlació temporal
+    void serversApi
+      .listServerDeployments(id, { limit: 100 })
+      .then((res) => {
+        setDeployments(res.items || []);
+      })
+      .catch(() => {});
   }, [id, range, fetchHistory]);
 
   const points: TelemetryHistoryPoint[] = history?.points ?? [];
@@ -83,7 +395,7 @@ export const ServerHistoryView: React.FC = () => {
 
   const load1mValues = points.map((p) => p.load_1m);
   const load5mValues = points.map((p) => p.load_5m);
-  const maxLoad = Math.max(2.5, ...load1mValues, 1);
+  const maxLoad = Math.max(3.0, ...load1mValues, ...load5mValues);
 
   const memValues = points.map((p) => p.memory_percent);
   const swapValues = points.map((p) => p.swap_percent);
@@ -96,11 +408,11 @@ export const ServerHistoryView: React.FC = () => {
         Object.keys(p.containers_memory_mb).forEach((k) => set.add(k));
       }
     }
-    return Array.from(set).slice(0, 3);
+    return Array.from(set).slice(0, 4);
   }, [points]);
 
   const maxContainerMem = React.useMemo(() => {
-    let m = 512;
+    let m = 256;
     for (const p of points) {
       if (p.containers_memory_mb) {
         for (const v of Object.values(p.containers_memory_mb)) {
@@ -108,7 +420,7 @@ export const ServerHistoryView: React.FC = () => {
         }
       }
     }
-    return m * 1.15;
+    return Math.max(256, m * 1.15);
   }, [points]);
 
   const pgConnSeries = points.map((p) => {
@@ -121,6 +433,18 @@ export const ServerHistoryView: React.FC = () => {
     if (vals.length === 0) return 0;
     return vals.reduce((acc, v) => acc + v, 0) / vals.length;
   });
+  const maxHttpLatency = Math.max(200, ...httpLatencySeries);
+
+  // Filtrar desplegaments en el rang seleccionat
+  const deploymentsInRange = useMemo(() => {
+    if (points.length < 2 || deployments.length === 0) return [];
+    const st = new Date(points[0].timestamp).getTime();
+    const et = new Date(points[points.length - 1].timestamp).getTime();
+    return deployments.filter((d) => {
+      const t = new Date(d.deployed_at).getTime();
+      return t >= st && t <= et;
+    });
+  }, [points, deployments]);
 
   const handleSaveRetention = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -129,7 +453,7 @@ export const ServerHistoryView: React.FC = () => {
       await updateRetention(Math.max(7, Number(retentionDaysInput) || 365));
       setRetentionModalOpen(false);
     } catch {
-      // Error handled in store
+      // Error gestionat a l'store
     } finally {
       setSavingRetention(false);
     }
@@ -137,7 +461,7 @@ export const ServerHistoryView: React.FC = () => {
 
   return (
     <Box>
-      {/* Barra superior */}
+      {/* Barra superior de navegació */}
       <Box
         sx={{
           display: 'flex',
@@ -179,23 +503,23 @@ export const ServerHistoryView: React.FC = () => {
         </Alert>
       )}
 
-      {/* Toolbar de rang temporal */}
+      {/* Toolbar de selecció de rang temporal */}
       <Box
         sx={{
           display: 'flex',
           justifyContent: 'space-between',
-          alignItems: 'center',
+          alignItems: { xs: 'flex-start', sm: 'center' },
+          flexDirection: { xs: 'column', sm: 'row' },
           mb: 2.5,
-          flexWrap: 'wrap',
           gap: 2,
         }}
       >
         <Box>
           <Typography component="h1" sx={{ fontSize: 20, fontWeight: 700, color: '#1e293b' }}>
-            Evolució Temporal de Mètriques (`HU-TEL-04`)
+            Evolució Temporal de Mètriques
           </Typography>
           <Typography sx={{ fontSize: 13, color: '#64748b' }}>
-            Mostres recollides periòdicament per `rawcraft-agent` (agregació automàtica per a rangs llargs).
+            Correlació de consums amb desplegaments de codi (línies verticals 🚀).
           </Typography>
         </Box>
 
@@ -220,7 +544,7 @@ export const ServerHistoryView: React.FC = () => {
                 borderRight: '1px solid #e2e8f0',
                 padding: '8px 14px',
                 fontSize: 13,
-                fontWeight: 500,
+                fontWeight: 600,
                 cursor: 'pointer',
               }}
             >
@@ -236,186 +560,182 @@ export const ServerHistoryView: React.FC = () => {
         </Box>
       ) : (
         <>
+          {/* GRID DE GRÀFIQUES TEMPORALS AMB EIXOS I LLEGENDA */}
           <Box
             sx={{
               display: 'grid',
-              gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' },
+              gridTemplateColumns: { xs: '1fr', lg: '1fr 1fr' },
               gap: 2.5,
               mb: 2.5,
             }}
           >
             {/* Gràfica 1: System Load */}
-            <Paper elevation={0} sx={{ border: '1px solid #e2e8f0', borderRadius: '10px', p: '18px 20px' }}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1.5 }}>
-                <Typography sx={{ fontSize: 14, fontWeight: 700 }}>
-                  System Load (`1m`, `5m`, `15m`)
-                </Typography>
-                <Typography sx={{ fontSize: 12.5, color: '#1976d2', fontFamily: '"Roboto Mono", monospace' }}>
-                  Actual: {latestPoint ? latestPoint.load_1m.toFixed(2) : '0.00'} | Màx {range}:{' '}
-                  {load1mValues.length > 0 ? Math.max(...load1mValues).toFixed(2) : '0.00'}
-                </Typography>
-              </Box>
-              <svg
-                viewBox="0 0 500 140"
-                preserveAspectRatio="none"
-                style={{
-                  width: '100%',
-                  height: 150,
-                  background: '#f8fafc',
-                  borderRadius: 6,
-                  border: '1px solid #e2e8f0',
-                }}
-              >
-                <line x1="0" y1="30" x2="500" y2="30" stroke="#fecaca" strokeDasharray="4 4" />
-                <polyline
-                  fill="none"
-                  stroke="#93c5fd"
-                  strokeWidth="1.75"
-                  points={buildSvgPolyline(load5mValues, maxLoad)}
-                />
-                <polyline
-                  fill="none"
-                  stroke="#1976d2"
-                  strokeWidth="2.5"
-                  points={buildSvgPolyline(load1mValues, maxLoad)}
-                />
-              </svg>
-            </Paper>
+            <MetricChartCard
+              title="System Load (Load Average)"
+              points={points}
+              range={range}
+              yMax={maxLoad}
+              yUnit="Load"
+              deployments={deployments}
+              alertThreshold={{ value: 2.5, label: 'Alerta (>2.5)' }}
+              currentSummary={`Actual: ${latestPoint ? latestPoint.load_1m.toFixed(2) : '0.00'} (1m)`}
+              series={[
+                { name: 'Load 1m', color: '#1976d2', values: load1mValues, strokeWidth: 2.5 },
+                { name: 'Load 5m', color: '#93c5fd', values: load5mValues, strokeWidth: 1.75 },
+              ]}
+            />
 
             {/* Gràfica 2: Memòria RAM, Swap i Disc */}
-            <Paper elevation={0} sx={{ border: '1px solid #e2e8f0', borderRadius: '10px', p: '18px 20px' }}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1.5 }}>
-                <Typography sx={{ fontSize: 14, fontWeight: 700 }}>
-                  Ús de Memòria RAM (%), Swap (%) i Disc `/` (%)
-                </Typography>
-                <Typography sx={{ fontSize: 12.5, color: '#16a34a', fontFamily: '"Roboto Mono", monospace' }}>
-                  RAM: {latestPoint ? Math.round(latestPoint.memory_percent) : 0}% | Swap:{' '}
-                  {latestPoint ? Math.round(latestPoint.swap_percent) : 0}% | Disc:{' '}
-                  {latestPoint ? Math.round(latestPoint.disk_root_percent) : 0}%
-                </Typography>
-              </Box>
-              <svg
-                viewBox="0 0 500 140"
-                preserveAspectRatio="none"
-                style={{
-                  width: '100%',
-                  height: 150,
-                  background: '#f8fafc',
-                  borderRadius: 6,
-                  border: '1px solid #e2e8f0',
-                }}
-              >
-                <polyline
-                  fill="none"
-                  stroke="#16a34a"
-                  strokeWidth="2.5"
-                  points={buildSvgPolyline(memValues, 100)}
-                />
-                <polyline
-                  fill="none"
-                  stroke="#d97706"
-                  strokeWidth="2"
-                  points={buildSvgPolyline(swapValues, 100)}
-                />
-                <polyline
-                  fill="none"
-                  stroke="#64748b"
-                  strokeWidth="1.5"
-                  strokeDasharray="3 3"
-                  points={buildSvgPolyline(diskValues, 100)}
-                />
-              </svg>
-            </Paper>
-          </Box>
+            <MetricChartCard
+              title="Memòria RAM, Swap i Disc / (%)"
+              points={points}
+              range={range}
+              yMax={100}
+              yUnit="%"
+              deployments={deployments}
+              alertThreshold={{ value: 85, label: 'Límit 85%' }}
+              currentSummary={`RAM: ${latestPoint ? Math.round(latestPoint.memory_percent) : 0}% • Disc: ${latestPoint ? Math.round(latestPoint.disk_root_percent) : 0}%`}
+              series={[
+                { name: 'Memòria RAM (%)', color: '#16a34a', values: memValues, strokeWidth: 2.5 },
+                { name: 'Swap (%)', color: '#d97706', values: swapValues, strokeWidth: 1.75 },
+                { name: 'Disc / (%)', color: '#64748b', values: diskValues, strokeWidth: 1.5, strokeDasharray: '4 4' },
+              ]}
+            />
 
-          <Box
-            sx={{
-              display: 'grid',
-              gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' },
-              gap: 2.5,
-            }}
-          >
             {/* Gràfica 3: Consum RAM per Contenidor Docker */}
-            <Paper elevation={0} sx={{ border: '1px solid #e2e8f0', borderRadius: '10px', p: '18px 20px' }}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1.5, flexWrap: 'wrap', gap: 1 }}>
-                <Typography sx={{ fontSize: 14, fontWeight: 700 }}>
-                  Consum RAM per Contenidor Docker (MB)
-                </Typography>
-                <Typography sx={{ fontSize: 12, fontFamily: '"Roboto Mono", monospace', color: '#475569' }}>
-                  {containerNames.length > 0
-                    ? containerNames
-                        .map((name) => {
-                          const val = latestPoint?.containers_memory_mb?.[name];
-                          return `${name} (${val !== undefined ? Math.round(val) : 0}MB)`;
-                        })
-                        .join(' • ')
-                    : 'Sense sèries de contenidors'}
-                </Typography>
-              </Box>
-              <svg
-                viewBox="0 0 500 140"
-                preserveAspectRatio="none"
-                style={{
-                  width: '100%',
-                  height: 150,
-                  background: '#f8fafc',
-                  borderRadius: 6,
-                  border: '1px solid #e2e8f0',
-                }}
-              >
-                {containerNames.map((name, idx) => {
-                  const colors = ['#7c3aed', '#0284c7', '#16a34a'];
-                  const series = points.map((p) => p.containers_memory_mb?.[name] ?? 0);
-                  return (
-                    <polyline
-                      key={name}
-                      fill="none"
-                      stroke={colors[idx % colors.length]}
-                      strokeWidth="2.2"
-                      points={buildSvgPolyline(series, maxContainerMem)}
-                    />
-                  );
-                })}
-              </svg>
-            </Paper>
+            <MetricChartCard
+              title="Consum RAM per Contenidor Docker (MB)"
+              points={points}
+              range={range}
+              yMax={maxContainerMem}
+              yUnit="MB"
+              deployments={deployments}
+              currentSummary={
+                containerNames.length > 0
+                  ? containerNames
+                      .map((name) => `${name}: ${Math.round(latestPoint?.containers_memory_mb?.[name] ?? 0)}M`)
+                      .join(' • ')
+                  : 'Cap sèrie'
+              }
+              series={containerNames.map((name, idx) => {
+                const colors = ['#7c3aed', '#0284c7', '#16a34a', '#e11d48'];
+                return {
+                  name,
+                  color: colors[idx % colors.length],
+                  values: points.map((p) => p.containers_memory_mb?.[name] ?? 0),
+                  strokeWidth: 2.2,
+                };
+              })}
+            />
 
             {/* Gràfica 4: PostgreSQL & Latència Endpoints HTTP */}
-            <Paper elevation={0} sx={{ border: '1px solid #e2e8f0', borderRadius: '10px', p: '18px 20px' }}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1.5, flexWrap: 'wrap', gap: 1 }}>
-                <Typography sx={{ fontSize: 14, fontWeight: 700 }}>
-                  PostgreSQL (% Connexions) &amp; Latència HTTP (ms)
-                </Typography>
-                <Typography sx={{ fontSize: 12, fontFamily: '"Roboto Mono", monospace', color: '#475569' }}>
-                  Conn: {pgConnSeries.length > 0 ? Math.round(pgConnSeries[pgConnSeries.length - 1]) : 0}% • HTTP:{' '}
-                  {httpLatencySeries.length > 0 ? Math.round(httpLatencySeries[httpLatencySeries.length - 1]) : 0} ms
-                </Typography>
-              </Box>
-              <svg
-                viewBox="0 0 500 140"
-                preserveAspectRatio="none"
-                style={{
-                  width: '100%',
-                  height: 150,
-                  background: '#f8fafc',
-                  borderRadius: 6,
-                  border: '1px solid #e2e8f0',
-                }}
-              >
-                <polyline
-                  fill="none"
-                  stroke="#0f766e"
-                  strokeWidth="2.5"
-                  points={buildSvgPolyline(pgConnSeries, 100)}
-                />
-                <polyline
-                  fill="none"
-                  stroke="#2563eb"
-                  strokeWidth="2"
-                  points={buildSvgPolyline(httpLatencySeries, Math.max(100, ...httpLatencySeries))}
-                />
-              </svg>
-            </Paper>
+            <MetricChartCard
+              title="PostgreSQL (% Connexions) & Latència HTTP (ms)"
+              points={points}
+              range={range}
+              yMax={Math.max(100, maxHttpLatency)}
+              yUnit="ms"
+              deployments={deployments}
+              currentSummary={`Conn: ${pgConnSeries.length > 0 ? Math.round(pgConnSeries[pgConnSeries.length - 1]) : 0}% • Latència: ${httpLatencySeries.length > 0 ? Math.round(httpLatencySeries[httpLatencySeries.length - 1]) : 0}ms`}
+              series={[
+                { name: 'PostgreSQL Connexions (%)', color: '#0f766e', values: pgConnSeries, strokeWidth: 2.5 },
+                { name: 'Latència Mitjana HTTP (ms)', color: '#2563eb', values: httpLatencySeries, strokeWidth: 2 },
+              ]}
+            />
           </Box>
+
+          {/* TIMELINE DE DESPLEGAMENTS EN EL RANG TEMPORAL */}
+          <Paper
+            elevation={0}
+            sx={{
+              border: '1px solid #e2e8f0',
+              borderRadius: '10px',
+              p: '18px 20px',
+              mb: 3,
+            }}
+          >
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+              <Typography sx={{ fontWeight: 700, fontSize: 15, color: '#1e293b' }}>
+                🚀 Timeline de Desplegaments en aquest rang ({range})
+              </Typography>
+              <Typography sx={{ fontSize: 12, color: '#64748b' }}>
+                {deploymentsInRange.length} desplegament(s) detectats
+              </Typography>
+            </Box>
+
+            {deploymentsInRange.length === 0 ? (
+              <Typography sx={{ fontSize: 13, color: '#64748b', fontStyle: 'italic', py: 1 }}>
+                No s&apos;ha registrat cap desplegament en aquesta finestra temporal ({range}). Els futurs canvis de codi via GitHub Actions apareixeran aquí i com a línies verticals a les gràfiques superiors.
+              </Typography>
+            ) : (
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                {deploymentsInRange.map((d) => {
+                  const isSuccess = d.status === 'SUCCESS';
+                  return (
+                    <Box
+                      key={d.id}
+                      sx={{
+                        display: 'flex',
+                        alignItems: { xs: 'flex-start', sm: 'center' },
+                        flexDirection: { xs: 'column', sm: 'row' },
+                        justifyContent: 'space-between',
+                        p: '10px 14px',
+                        bgcolor: '#f8fafc',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '8px',
+                        gap: 1,
+                      }}
+                    >
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, flexWrap: 'wrap' }}>
+                        <Box
+                          component="span"
+                          sx={{
+                            width: 10,
+                            height: 10,
+                            borderRadius: '50%',
+                            bgcolor: isSuccess ? '#16a34a' : '#dc2626',
+                          }}
+                        />
+                        <Typography sx={{ fontWeight: 700, fontSize: 13, color: '#1e293b' }}>
+                          {d.product_name}
+                        </Typography>
+                        <Box
+                          component="span"
+                          sx={{
+                            fontFamily: '"Roboto Mono", monospace',
+                            fontSize: 12,
+                            px: 0.8,
+                            py: 0.2,
+                            bgcolor: '#eff6ff',
+                            color: '#1d4ed8',
+                            borderRadius: '4px',
+                            fontWeight: 600,
+                          }}
+                        >
+                          {d.version}
+                        </Box>
+                        {d.commit_sha && (
+                          <Typography sx={{ fontFamily: '"Roboto Mono", monospace', fontSize: 11.5, color: '#64748b' }}>
+                            #{d.commit_sha.slice(0, 7)}
+                          </Typography>
+                        )}
+                        {d.commit_message && (
+                          <Typography sx={{ fontSize: 12.5, color: '#475569' }}>
+                            &ldquo;{d.commit_message}&rdquo;
+                          </Typography>
+                        )}
+                      </Box>
+
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, fontSize: 12, color: '#64748b' }}>
+                        {d.deployed_by && <span>per <strong>{d.deployed_by}</strong></span>}
+                        <span>{formatRelativeTime(d.deployed_at)} ({new Date(d.deployed_at).toLocaleTimeString()})</span>
+                      </Box>
+                    </Box>
+                  );
+                })}
+              </Box>
+            )}
+          </Paper>
         </>
       )}
 
