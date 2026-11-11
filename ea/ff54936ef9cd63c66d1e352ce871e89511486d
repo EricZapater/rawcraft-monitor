@@ -1,0 +1,34 @@
+.agent/backend-agent.md
+  h_42175f19913982 1-85
+.agent/frontend-agent.md
+  h_42175f19913982 1-91
+.agent/infra-agent.md
+  h_42175f19913982 1-128
+.agent/mobile-agent.md
+  h_42175f19913982 1-106
+.agent/mockup-agent.md
+  h_42175f19913982 1-104
+.agent/orchestrator.md
+  h_42175f19913982 1-116
+.agent/qa-agent.md
+  h_42175f19913982 1-180
+.agent/security-agent.md
+  h_42175f19913982 1-190
+.agent/ux-agent.md
+  h_42175f19913982 1-135
+constitution.md
+  h_42175f19913982 1-385
+product-functional-spec.md
+  h_42175f19913982 1-186
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "eaff54936ef9cd63c66d1e352ce871e89511486d",
+  "prompts": {},
+  "humans": {
+    "h_42175f19913982": {
+      "author": "Èric Zapater <ericzm@ext.inditex.com>"
+    }
+  }
+}
