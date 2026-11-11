@@ -701,17 +701,6 @@ export const ServerHistoryView: React.FC = () => {
   });
   const maxHttpLatency = Math.max(200, ...httpLatencySeries);
 
-  // Filtrar desplegaments en el rang seleccionat
-  const deploymentsInRange = useMemo(() => {
-    if (points.length < 2 || deployments.length === 0) return [];
-    const st = new Date(points[0].timestamp).getTime();
-    const et = new Date(points[points.length - 1].timestamp).getTime();
-    return deployments.filter((d) => {
-      const t = new Date(d.deployed_at).getTime();
-      return t >= st && t <= et;
-    });
-  }, [points, deployments]);
-
   const handleSaveRetention = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setSavingRetention(true);
@@ -931,99 +920,6 @@ export const ServerHistoryView: React.FC = () => {
               deployments={deployments}
             />
           </Box>
-
-          {/* TIMELINE DE DESPLEGAMENTS EN EL RANG TEMPORAL */}
-          <Paper
-            elevation={0}
-            sx={{
-              border: '1px solid #e2e8f0',
-              borderRadius: '10px',
-              p: '18px 20px',
-              mb: 3,
-            }}
-          >
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-              <Typography sx={{ fontWeight: 700, fontSize: 15, color: '#1e293b' }}>
-                🚀 Timeline de Desplegaments en aquest rang ({range})
-              </Typography>
-              <Typography sx={{ fontSize: 12, color: '#64748b' }}>
-                {deploymentsInRange.length} desplegament(s) detectats
-              </Typography>
-            </Box>
-
-            {deploymentsInRange.length === 0 ? (
-              <Typography sx={{ fontSize: 13, color: '#64748b', fontStyle: 'italic', py: 1 }}>
-                No s&apos;ha registrat cap desplegament en aquesta finestra temporal ({range}). Els futurs canvis de codi via GitHub Actions apareixeran aquí i com a línies verticals a les gràfiques superiors.
-              </Typography>
-            ) : (
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                {deploymentsInRange.map((d) => {
-                  const isSuccess = d.status === 'SUCCESS';
-                  return (
-                    <Box
-                      key={d.id}
-                      sx={{
-                        display: 'flex',
-                        alignItems: { xs: 'flex-start', sm: 'center' },
-                        flexDirection: { xs: 'column', sm: 'row' },
-                        justifyContent: 'space-between',
-                        p: '10px 14px',
-                        bgcolor: '#f8fafc',
-                        border: '1px solid #e2e8f0',
-                        borderRadius: '8px',
-                        gap: 1,
-                      }}
-                    >
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, flexWrap: 'wrap' }}>
-                        <Box
-                          component="span"
-                          sx={{
-                            width: 10,
-                            height: 10,
-                            borderRadius: '50%',
-                            bgcolor: isSuccess ? '#16a34a' : '#dc2626',
-                          }}
-                        />
-                        <Typography sx={{ fontWeight: 700, fontSize: 13, color: '#1e293b' }}>
-                          {d.product_name}
-                        </Typography>
-                        <Box
-                          component="span"
-                          sx={{
-                            fontFamily: '"Roboto Mono", monospace',
-                            fontSize: 12,
-                            px: 0.8,
-                            py: 0.2,
-                            bgcolor: '#eff6ff',
-                            color: '#1d4ed8',
-                            borderRadius: '4px',
-                            fontWeight: 600,
-                          }}
-                        >
-                          {d.version}
-                        </Box>
-                        {d.commit_sha && (
-                          <Typography sx={{ fontFamily: '"Roboto Mono", monospace', fontSize: 11.5, color: '#64748b' }}>
-                            #{d.commit_sha.slice(0, 7)}
-                          </Typography>
-                        )}
-                        {d.commit_message && (
-                          <Typography sx={{ fontSize: 12.5, color: '#475569' }}>
-                            &ldquo;{d.commit_message}&rdquo;
-                          </Typography>
-                        )}
-                      </Box>
-
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, fontSize: 12, color: '#64748b' }}>
-                        {d.deployed_by && <span>per <strong>{d.deployed_by}</strong></span>}
-                        <span>{formatRelativeTime(d.deployed_at)} ({new Date(d.deployed_at).toLocaleTimeString()})</span>
-                      </Box>
-                    </Box>
-                  );
-                })}
-              </Box>
-            )}
-          </Paper>
         </>
       )}
 

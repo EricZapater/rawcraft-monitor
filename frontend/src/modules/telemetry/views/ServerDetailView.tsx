@@ -431,6 +431,7 @@ export const ServerDetailView: React.FC = () => {
 
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
           <Box
+            title={`Estat del servidor: ${liveDetail?.status || 'UNKNOWN'}`}
             sx={{
               display: 'inline-flex',
               alignItems: 'center',
@@ -440,14 +441,28 @@ export const ServerDetailView: React.FC = () => {
               bgcolor: '#f8fafc',
               border: '1px solid #e2e8f0',
               borderRadius: '8px',
+              cursor: 'help',
             }}
           >
             <Box
               sx={{
-                width: 8,
-                height: 8,
+                width: 9,
+                height: 9,
                 borderRadius: '50%',
-                bgcolor: liveDetail?.status === 'ONLINE' ? '#16a34a' : '#dc2626',
+                bgcolor:
+                  liveDetail?.status === 'ONLINE'
+                    ? '#16a34a'
+                    : liveDetail?.status === 'WARNING'
+                      ? '#d97706'
+                      : liveDetail?.status === 'CRITICAL' || liveDetail?.status === 'OFFLINE'
+                        ? '#dc2626'
+                        : '#64748b',
+                boxShadow:
+                  liveDetail?.status === 'ONLINE'
+                    ? '0 0 0 2px rgba(22, 163, 74, 0.2)'
+                    : liveDetail?.status === 'WARNING'
+                      ? '0 0 0 2px rgba(217, 119, 6, 0.2)'
+                      : '0 0 0 2px rgba(220, 38, 38, 0.2)',
               }}
             />
             <Typography sx={{ fontSize: 12, color: '#1e293b', fontWeight: 600 }}>

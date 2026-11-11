@@ -5,6 +5,19 @@ Tots els canvis rellevants d'aquest projecte es documenten en aquest fitxer.
 El format es basa en [Keep a Changelog](https://keepachangelog.com/ca/1.0.0/),
 i aquest projecte segueix [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.2] - 2026-11-11
+
+### Changed
+- **Neteja a la Vista d'Històric ([`ServerHistoryView.tsx`](frontend/src/modules/telemetry/views/ServerHistoryView.tsx))**:
+  - Eliminada la llista/taula redundant de desplegaments que apareixia a sota de les gràfiques, ja que aquesta llista completa ja està disponible de forma interactiva a la pestanya de Desplegaments del Detall del Servidor.
+  - Es conserva intacta la gràfica `DeploymentsTimelineChartCard` com a 6è panell a la graella superior sincronitzada amb la finestra temporal.
+- **Indicador Visual d'Estat del Servidor ([`ServerDetailView.tsx`](frontend/src/modules/telemetry/views/ServerDetailView.tsx))**:
+  - Millorat el punt lluminós del widget de control perquè reflecteixi els estats:
+    - Verd (`#16a34a`): `ONLINE`
+    - Taronja (`#d97706`): `WARNING` (alertes disparades o reinici pendent)
+    - Vermell (`#dc2626`): `CRITICAL` (serveis caiguts) o `OFFLINE` (silenci > $2.5 \times \text{report\_interval}$)
+  - Afegit tooltip interactiu explicatiu en passar el cursor per sobre.
+
 ## [0.2.1] - 2026-11-11
 
 ### Added
