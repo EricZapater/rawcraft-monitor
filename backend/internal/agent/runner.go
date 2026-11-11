@@ -33,7 +33,7 @@ func NewRunner(cfg *Config) *Runner {
 		cfg:       cfg,
 		evaluator: NewEvaluator(),
 		httpClient: &http.Client{
-			Timeout: 10 * time.Second,
+			Timeout: 30 * time.Second,
 			Transport: &http.Transport{
 				DisableKeepAlives: true,
 			},

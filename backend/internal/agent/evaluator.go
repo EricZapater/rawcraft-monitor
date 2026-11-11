@@ -2,6 +2,7 @@ package agent
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -195,22 +196,37 @@ func (e *Evaluator) Evaluate(
 			for _, c := range docker.Containers {
 				seenContainers[c.Name] = c
 				if cfg.Docker.AlertOnContainerDown {
-					isDown := c.State != "running" || c.Health == "unhealthy"
-					curState := fmt.Sprintf("%s (%s)", c.State, c.Health)
-					if ev := e.evalBooleanDownRule(
-						serverUUID,
-						fmt.Sprintf("docker:container:%s", c.Name),
-						alert.CategoryDocker,
-						alert.SeverityCritical,
-						c.Name,
-						fmt.Sprintf("Contenidor Docker %s caigut o unhealthy", c.Name),
-						isDown,
-						1,
-						curState,
-						"running",
-						now,
-					); ev != nil {
-						events = append(events, *ev)
+					// Si s'han definit contenidors obligatoris (required_containers), només alertem per la caiguda
+					// d'aquests contenidors. Si la llista és buida, alertem per qualsevol contenidor no exclòs.
+					shouldAlertDown := true
+					if len(cfg.Docker.RequiredContainers) > 0 {
+						shouldAlertDown = false
+						for _, reqName := range cfg.Docker.RequiredContainers {
+							if c.Name == reqName || strings.TrimPrefix(c.Name, "/") == strings.TrimPrefix(reqName, "/") {
+								shouldAlertDown = true
+								break
+							}
+						}
+					}
+
+					if shouldAlertDown {
+						isDown := c.State != "running" || c.Health == "unhealthy"
+						curState := fmt.Sprintf("%s (%s)", c.State, c.Health)
+						if ev := e.evalBooleanDownRule(
+							serverUUID,
+							fmt.Sprintf("docker:container:%s", c.Name),
+							alert.CategoryDocker,
+							alert.SeverityCritical,
+							c.Name,
+							fmt.Sprintf("Contenidor Docker %s caigut o unhealthy", c.Name),
+							isDown,
+							1,
+							curState,
+							"running",
+							now,
+						); ev != nil {
+							events = append(events, *ev)
+						}
 					}
 				}
 

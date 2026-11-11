@@ -5,6 +5,20 @@ Tots els canvis rellevants d'aquest projecte es documenten en aquest fitxer.
 El format es basa en [Keep a Changelog](https://keepachangelog.com/ca/1.0.0/),
 i aquest projecte segueix [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.4] - 2026-11-11
+
+### Fixed
+- **Suport natiu per al port 465 (SMTPS amb SSL/TLS directe) i traces de log a SMTP**:
+  - Implementat `tls.Dial` a [`smtp.go`](backend/internal/shared/smtp.go) per connectar a servidors SMTP que requereixen TLS directe des del primer byte (evitant l'error `EOF` de `net/smtp`).
+  - Afegits logs detallats d'inici, remitent, destinataris, mode TLS i resultat d'enviament SMTP.
+  - Enviament de correu asíncron al servei d'alertes ([`alert/service.go`](backend/internal/alert/service.go)) per evitar que un retard de xarxa al servidor SMTP bloquegi les peticions HTTP de l'agent.
+- **Filtrat d'alertes de contenidors Docker caiguts segons `required_containers`**:
+  - A [`evaluator.go`](backend/internal/agent/evaluator.go), si s'ha definit una llista de contenidors obligatoris (`required_containers`), l'alerta `AlertOnContainerDown` només es dispara si un d'aquests contenidors obligatoris no està `running` o està `unhealthy` (evitant que contenidors aturats aliens disparin falses alarmes).
+- **Traces de log detallades per a la connexió de PostgreSQL**:
+  - A [`collector_postgres.go`](backend/internal/agent/collector_postgres.go), s'imprimeix al log de l'agent l'error exacte de connexió (host, port, db, usuari) o el temps de resposta en mil·lisegons si és correcte.
+- **Augment del timeout del client HTTP de l'agent**:
+  - Pujat de 10s a 30s a [`runner.go`](backend/internal/agent/runner.go) per evitar `context deadline exceeded` en xarxes amb latència.
+
 ## [0.1.3] - 2026-11-11
 
 ### Changed

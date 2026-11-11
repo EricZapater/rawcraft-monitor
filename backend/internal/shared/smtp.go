@@ -1,11 +1,15 @@
 package shared
 
 import (
+	"crypto/tls"
 	"fmt"
+	"log"
+	"net"
 	"net/smtp"
 	"os"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // SMTPConfig conté els paràmetres d'enviament de correu per SMTP.
@@ -52,9 +56,18 @@ func ResolveGlobalSMTP(cfg SMTPConfig) SMTPConfig {
 }
 
 // SendAlertEmail envia un correu d'alerta o recuperació via SMTP.
+// Suporta tant port 465 (SSL/TLS directe) com ports 587/25 (STARTTLS).
 func SendAlertEmail(cfg SMTPConfig, subject, body string) error {
 	resolved := ResolveGlobalSMTP(cfg)
-	if !resolved.Enabled || len(resolved.ToEmails) == 0 || resolved.Host == "" {
+	if !resolved.Enabled {
+		return nil
+	}
+	if len(resolved.ToEmails) == 0 {
+		log.Printf("[smtp] Enviament omès: no hi ha destinataris configurats (to_emails buit)")
+		return nil
+	}
+	if resolved.Host == "" {
+		log.Printf("[smtp] Enviament omès: servidor SMTP no definit (host buit)")
 		return nil
 	}
 
@@ -71,7 +84,75 @@ func SendAlertEmail(cfg SMTPConfig, subject, body string) error {
 		"MIME-Version: 1.0",
 		"Content-Type: text/plain; charset=\"UTF-8\"",
 	}
-	msg := strings.Join(headers, "\r\n") + "\r\n\r\n" + body + "\r\n"
+	msg := []byte(strings.Join(headers, "\r\n") + "\r\n\r\n" + body + "\r\n")
 
-	return smtp.SendMail(addr, auth, resolved.FromEmail, resolved.ToEmails, []byte(msg))
+	mode := "STARTTLS/Plain"
+	if resolved.Port == 465 {
+		mode = "SSL/TLS directe"
+	}
+	log.Printf("[smtp] Enviant correu a %v via %s (mode %s, remitent: %s)...",
+		resolved.ToEmails, addr, mode, resolved.FromEmail)
+
+	var err error
+	if resolved.Port == 465 {
+		err = sendViaDirectTLS(addr, resolved.Host, auth, resolved.FromEmail, resolved.ToEmails, msg)
+	} else {
+		err = smtp.SendMail(addr, auth, resolved.FromEmail, resolved.ToEmails, msg)
+	}
+
+	if err != nil {
+		log.Printf("[smtp] ERROR enviant correu a %s: %v", addr, err)
+		return err
+	}
+
+	log.Printf("[smtp] Correu enviat correctament a %v ('%s')", resolved.ToEmails, subject)
+	return nil
+}
+
+func sendViaDirectTLS(addr, host string, auth smtp.Auth, from string, to []string, msg []byte) error {
+	tlsConfig := &tls.Config{
+		ServerName: host,
+	}
+	dialer := &net.Dialer{Timeout: 15 * time.Second}
+	conn, err := tls.DialWithDialer(dialer, "tcp", addr, tlsConfig)
+	if err != nil {
+		return fmt.Errorf("tls dial (%s): %w", addr, err)
+	}
+	defer conn.Close()
+
+	client, err := smtp.NewClient(conn, host)
+	if err != nil {
+		return fmt.Errorf("smtp client creation (%s): %w", addr, err)
+	}
+	defer client.Close()
+
+	if auth != nil {
+		if ok, _ := client.Extension("AUTH"); ok {
+			if err := client.Auth(auth); err != nil {
+				return fmt.Errorf("smtp auth error: %w", err)
+			}
+		}
+	}
+
+	if err := client.Mail(from); err != nil {
+		return fmt.Errorf("smtp mail from (%s): %w", from, err)
+	}
+	for _, recipient := range to {
+		if err := client.Rcpt(recipient); err != nil {
+			return fmt.Errorf("smtp rcpt to (%s): %w", recipient, err)
+		}
+	}
+
+	w, err := client.Data()
+	if err != nil {
+		return fmt.Errorf("smtp data command: %w", err)
+	}
+	if _, err := w.Write(msg); err != nil {
+		return fmt.Errorf("smtp write message: %w", err)
+	}
+	if err := w.Close(); err != nil {
+		return fmt.Errorf("smtp close data: %w", err)
+	}
+
+	return client.Quit()
 }

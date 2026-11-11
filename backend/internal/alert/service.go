@@ -69,9 +69,12 @@ func (s *Service) ReportAgentAlertEvent(ctx context.Context, authenticatedServer
 			srv.Name, srv.ID.String(), req.Status, req.Category, req.Severity,
 			req.TargetName, req.Message, time.Now().Format(time.RFC3339),
 		)
-		if err := shared.SendAlertEmail(srv.Config.SMTP, subject, body); err != nil {
-			log.Printf("[alert] Error enviant correu SMTP per a %s: %v", srv.Name, err)
-		}
+		smtpCfg := srv.Config.SMTP
+		go func() {
+			if err := shared.SendAlertEmail(smtpCfg, subject, body); err != nil {
+				log.Printf("[alert] Error enviant correu SMTP per a %s: %v", srv.Name, err)
+			}
+		}()
 	}
 
 	return result, nil

@@ -96,6 +96,17 @@ func TestEvaluator_DockerAndHttpTransitions(t *testing.T) {
 	if len(events) != 1 || events[0].Status != alert.StatusResolved {
 		t.Fatalf("s'esperava alerta RESOLVED per a nasc-backend, rebut: %+v", events)
 	}
+
+	// Si es defineix RequiredContainers, un contenidor aliè caigut NO ha de disparar alerta
+	cfg.Docker.RequiredContainers = []string{"traefik"}
+	dockerSnap.Containers = []telemetry.DockerContainerSnapshot{
+		{Name: "traefik", State: "running", Health: "healthy"},
+		{Name: "random-backup-job", State: "exited", Health: "none"},
+	}
+	events = eval.Evaluate(cfg, nil, dockerSnap, nil, nil)
+	if len(events) != 0 {
+		t.Fatalf("un contenidor aturat fora de required_containers no ha de disparar alerta, rebut: %+v", events)
+	}
 }
 
 type roundTripFunc func(*http.Request) (*http.Response, error)

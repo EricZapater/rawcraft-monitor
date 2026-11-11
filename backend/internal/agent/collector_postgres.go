@@ -3,6 +3,7 @@ package agent
 import (
 	"context"
 	"fmt"
+	"log"
 	"net/url"
 	"time"
 
@@ -63,6 +64,8 @@ func checkPostgresInstance(ctx context.Context, inst server.PostgresInstanceConf
 	if err != nil {
 		errMsg := err.Error()
 		snap.ErrorMessage = &errMsg
+		log.Printf("[agent] [postgres] Error connectant a la instància '%s' (%s:%d/%s amb usuari '%s'): %v",
+			inst.Name, host, port, dbname, inst.User, err)
 		return snap
 	}
 	defer func() { _ = conn.Close(context.Background()) }()
@@ -71,10 +74,12 @@ func checkPostgresInstance(ctx context.Context, inst server.PostgresInstanceConf
 	if err := conn.QueryRow(connCtx, `SELECT 1`).Scan(&one); err != nil {
 		errMsg := err.Error()
 		snap.ErrorMessage = &errMsg
+		log.Printf("[agent] [postgres] Error executant 'SELECT 1' a la instància '%s': %v", inst.Name, err)
 		return snap
 	}
 	snap.LatencyMs = int(time.Since(start).Milliseconds())
 	snap.Up = true
+	log.Printf("[agent] [postgres] Instància '%s' connectada correctament (%dms)", inst.Name, snap.LatencyMs)
 
 	// Connexions actives vs max_connections
 	_ = conn.QueryRow(connCtx, `SELECT current_setting('max_connections')::int`).Scan(&snap.MaxConnections)
