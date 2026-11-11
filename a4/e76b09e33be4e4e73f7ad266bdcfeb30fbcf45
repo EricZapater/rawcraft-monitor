@@ -1,0 +1,40 @@
+.env.backend.example
+  h_42175f19913982 1-38
+.env.example
+  h_42175f19913982 1-28
+.env.frontend.example
+  h_42175f19913982 1-5
+.github/workflows/ci.yml
+  h_42175f19913982 1-62
+.github/workflows/deploy.yml
+  h_42175f19913982 1-163
+.gitignore
+  h_42175f19913982 1-22
+CHANGELOG.md
+  h_42175f19913982 1-29
+VERSION
+  h_42175f19913982 1
+backend/.dockerignore
+  h_42175f19913982 1-5
+backend/Dockerfile
+  h_42175f19913982 1-18
+docker-compose.yml
+  h_42175f19913982 1-43
+frontend/.dockerignore
+  h_42175f19913982 1-3
+frontend/Dockerfile
+  h_42175f19913982 1-25
+frontend/nginx.conf
+  h_42175f19913982 1-23
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "a4e76b09e33be4e4e73f7ad266bdcfeb30fbcf45",
+  "prompts": {},
+  "humans": {
+    "h_42175f19913982": {
+      "author": "Èric Zapater <ericzm@ext.inditex.com>"
+    }
+  }
+}
