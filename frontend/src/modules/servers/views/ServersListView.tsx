@@ -21,12 +21,14 @@ export const ServersListView: React.FC = () => {
   const navigate = useNavigate();
   const {
     servers,
+    yamlBundle,
     loading,
     error,
     fetchServers,
     createServer,
     deleteServer,
     rotateApiKey,
+    fetchConfigYaml,
     clearError,
   } = useServersStore();
   const { currentUser } = useUsersStore();
@@ -46,6 +48,12 @@ export const ServersListView: React.FC = () => {
     isNew: boolean;
   } | null>(null);
   const [copiedKey, setCopiedKey] = useState(false);
+  const [copiedKeyModalBash, setCopiedKeyModalBash] = useState(false);
+
+  const [installModalServer, setInstallModalServer] = useState<Server | null>(null);
+  const [installLoading, setInstallLoading] = useState(false);
+  const [copiedInstallBash, setCopiedInstallBash] = useState(false);
+  const [copiedUpdateBash, setCopiedUpdateBash] = useState(false);
 
   const [deleteTarget, setDeleteTarget] = useState<Server | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -128,6 +136,51 @@ export const ServersListView: React.FC = () => {
       setCopiedKey(true);
     } catch {
       setCopiedKey(false);
+    }
+  };
+
+  const getApiOrigin = () => {
+    const raw = import.meta.env.VITE_API_URL || window.location.origin;
+    return raw.replace(/\/api\/v1\/?$/, '').replace(/\/$/, '');
+  };
+
+  const buildCurlInstallScript = (apiKey: string) => {
+    const base = getApiOrigin();
+    return `# 1. Descarregar el binari estàtic de l'agent directament del Punt Central
+sudo curl -fsSL ${base}/api/v1/agent/binary -o /usr/local/bin/rawcraft-agent
+sudo chmod 0755 /usr/local/bin/rawcraft-agent
+
+# 2. Descarregar el config.yaml d'aquest servidor autenticat amb la seva API Key
+sudo mkdir -p /etc/rawcraft-agent
+sudo curl -fsSL -H "X-Agent-Key: ${apiKey}" ${base}/api/v1/agent/config.yaml -o /etc/rawcraft-agent/config.yaml
+sudo chmod 0600 /etc/rawcraft-agent/config.yaml
+
+# 3. Descarregar la unitat systemd (amb límit GOMEMLIMIT=20MiB i MemoryMax=30M) i arrencar
+sudo curl -fsSL ${base}/api/v1/agent/systemd.service -o /etc/systemd/system/rawcraft-agent.service
+sudo systemctl daemon-reload
+sudo systemctl enable --now rawcraft-agent
+sudo systemctl status rawcraft-agent`;
+  };
+
+  const extractUpdateYamlCommand = (installCmds?: string) => {
+    if (!installCmds) return '';
+    const match = installCmds.match(/sudo curl -fsSL -H "X-Agent-Key: [^"]+" [^\n]+/);
+    if (!match) return '';
+    return `${match[0]}\nsudo chmod 0600 /etc/rawcraft-agent/config.yaml\nsudo systemctl restart rawcraft-agent`;
+  };
+
+  const handleOpenInstallModal = async (srv: Server) => {
+    clearError();
+    setCopiedInstallBash(false);
+    setCopiedUpdateBash(false);
+    setInstallModalServer(srv);
+    setInstallLoading(true);
+    try {
+      await fetchConfigYaml(srv.id);
+    } catch {
+      // Error surfaced in store
+    } finally {
+      setInstallLoading(false);
     }
   };
 
@@ -370,6 +423,20 @@ export const ServersListView: React.FC = () => {
                       <td style={{ padding: '16px 18px' }}>
                         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75 }}>
                           <Button
+                            variant="contained"
+                            size="small"
+                            onClick={() => void handleOpenInstallModal(srv)}
+                            sx={{
+                              textTransform: 'none',
+                              bgcolor: '#1976d2',
+                              color: '#ffffff',
+                              fontSize: 13,
+                              fontWeight: 500,
+                            }}
+                          >
+                            Instal·lació des del servidor
+                          </Button>
+                          <Button
                             variant="outlined"
                             size="small"
                             onClick={() => navigate(`/servers/${srv.id}/config`)}
@@ -557,17 +624,17 @@ export const ServersListView: React.FC = () => {
       <Dialog
         open={Boolean(generatedKeyModal)}
         onClose={() => setGeneratedKeyModal(null)}
-        maxWidth="sm"
+        maxWidth="md"
         fullWidth
       >
         <DialogTitle sx={{ fontWeight: 700, fontSize: 17, borderBottom: '1px solid #e2e8f0' }}>
-          Nova API Key Generada (`{generatedKeyModal?.serverName}`)
+          Nova API Key &amp; Instal·lació des del servidor (`{generatedKeyModal?.serverName}`)
         </DialogTitle>
         <DialogContent sx={{ pt: '20px !important' }}>
-          <Typography sx={{ fontSize: 13, color: '#64748b', mb: 1.5 }}>
+          <Typography sx={{ fontSize: 13, color: '#64748b', mb: 1 }}>
             {generatedKeyModal?.isNew
-              ? "S'ha generat l'API Key única d'autenticació per a l'agent d'aquest servidor. Quedarà incrustada automàticament quan descarreguis el config.yaml:"
-              : "L'anterior api_key ha quedat invalidada. Descarrega de nou el config.yaml o actualitza el camp api_key a /etc/rawcraft-agent/config.yaml:"}
+              ? "S'ha generat l'API Key única d'autenticació per a l'agent d'aquest servidor:"
+              : "L'anterior api_key ha quedat invalidada. Nova API Key activa:"}
           </Typography>
           <Box
             sx={{
@@ -578,9 +645,46 @@ export const ServersListView: React.FC = () => {
               fontFamily: '"Roboto Mono", monospace',
               fontSize: 12.5,
               wordBreak: 'break-all',
+              mb: 2.5,
             }}
           >
             {generatedKeyModal?.apiKey}
+          </Box>
+
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+            <Typography sx={{ fontSize: 13.5, fontWeight: 700, color: '#1e293b' }}>
+              Instal·lació des del servidor (Executa aquest Bash per SSH a la màquina):
+            </Typography>
+            <Button
+              type="button"
+              variant="outlined"
+              size="small"
+              onClick={async () => {
+                if (generatedKeyModal) {
+                  await navigator.clipboard.writeText(buildCurlInstallScript(generatedKeyModal.apiKey));
+                  setCopiedKeyModalBash(true);
+                }
+              }}
+              sx={{ textTransform: 'none', borderColor: '#1976d2', color: '#1976d2', fontSize: 12 }}
+            >
+              {copiedKeyModalBash ? 'Bash copiat!' : 'Copiar Bash d\'instal·lació'}
+            </Button>
+          </Box>
+          <Box
+            component="pre"
+            sx={{
+              bgcolor: '#0f172a',
+              color: '#e2e8f0',
+              p: 2,
+              borderRadius: '8px',
+              fontFamily: '"Roboto Mono", monospace',
+              fontSize: 12,
+              lineHeight: 1.55,
+              overflowX: 'auto',
+              m: 0,
+            }}
+          >
+            {generatedKeyModal ? buildCurlInstallScript(generatedKeyModal.apiKey) : ''}
           </Box>
         </DialogContent>
         <DialogActions sx={{ px: 3, py: 1.75, bgcolor: '#f8fafc', borderTop: '1px solid #e2e8f0' }}>
@@ -590,7 +694,7 @@ export const ServersListView: React.FC = () => {
             onClick={() => generatedKeyModal && handleCopyKey(generatedKeyModal.apiKey)}
             sx={{ textTransform: 'none', borderColor: '#e2e8f0', color: '#1e293b' }}
           >
-            {copiedKey ? 'Copiada!' : 'Copiar API Key'}
+            {copiedKey ? 'Copiada!' : 'Copiar només API Key'}
           </Button>
           <Button
             type="button"
@@ -598,13 +702,165 @@ export const ServersListView: React.FC = () => {
             onClick={() => {
               const targetId = generatedKeyModal?.serverId;
               setGeneratedKeyModal(null);
+              setCopiedKeyModalBash(false);
               if (targetId) {
                 navigate(`/servers/${targetId}/config`);
               }
             }}
             sx={{ textTransform: 'none', bgcolor: '#1976d2' }}
           >
-            Entès, configurar i descarregar `config.yaml`
+            Configurar 4 Potetes i `config.yaml`
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Modal Instal·lació des del servidor (accés directe des de l'Inventari) */}
+      <Dialog
+        open={Boolean(installModalServer)}
+        onClose={() => setInstallModalServer(null)}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle sx={{ fontWeight: 700, fontSize: 17, borderBottom: '1px solid #e2e8f0' }}>
+          Instal·lació des del servidor (`{installModalServer?.name}`)
+        </DialogTitle>
+        <DialogContent sx={{ pt: '20px !important' }}>
+          {installLoading ? (
+            <Box sx={{ py: 4, textAlign: 'center' }}>
+              <CircularProgress size={28} />
+            </Box>
+          ) : (
+            <Box>
+              <Box
+                sx={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  mb: 1,
+                  flexWrap: 'wrap',
+                  gap: 1,
+                }}
+              >
+                <Box>
+                  <Typography sx={{ fontSize: 14, fontWeight: 700, color: '#1e293b' }}>
+                    1. Instal·lació completa per `curl` (Binari + `config.yaml` + `systemd`)
+                  </Typography>
+                  <Typography sx={{ fontSize: 12.5, color: '#64748b' }}>
+                    Enganxa aquest bloc directament a la terminal SSH del servidor <strong>{installModalServer?.name}</strong>:
+                  </Typography>
+                </Box>
+                <Button
+                  type="button"
+                  variant="contained"
+                  size="small"
+                  onClick={async () => {
+                    if (yamlBundle?.install_commands) {
+                      await navigator.clipboard.writeText(yamlBundle.install_commands);
+                      setCopiedInstallBash(true);
+                    }
+                  }}
+                  sx={{ textTransform: 'none', bgcolor: '#1976d2', fontWeight: 600 }}
+                >
+                  {copiedInstallBash ? 'Bash d\'instal·lació copiat!' : 'Copiar tot el Bash d\'instal·lació'}
+                </Button>
+              </Box>
+
+              <Box
+                component="pre"
+                sx={{
+                  bgcolor: '#0f172a',
+                  color: '#e2e8f0',
+                  p: 2,
+                  borderRadius: '8px',
+                  fontFamily: '"Roboto Mono", monospace',
+                  fontSize: 12,
+                  lineHeight: 1.55,
+                  overflowX: 'auto',
+                  m: 0,
+                  mb: 2.5,
+                }}
+              >
+                {yamlBundle?.install_commands || 'Carregant comandes curl...'}
+              </Box>
+
+              {extractUpdateYamlCommand(yamlBundle?.install_commands) && (
+                <Box>
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      mb: 1,
+                      flexWrap: 'wrap',
+                      gap: 1,
+                    }}
+                  >
+                    <Box>
+                      <Typography sx={{ fontSize: 13.5, fontWeight: 700, color: '#1e293b' }}>
+                        2. Només actualitzar el `config.yaml` i reiniciar l&apos;agent
+                      </Typography>
+                      <Typography sx={{ fontSize: 12, color: '#64748b' }}>
+                        Si ja tens l&apos;agent instal·lat i només has canviat llindars o potetes a la web:
+                      </Typography>
+                    </Box>
+                    <Button
+                      type="button"
+                      variant="outlined"
+                      size="small"
+                      onClick={async () => {
+                        const cmd = extractUpdateYamlCommand(yamlBundle?.install_commands);
+                        if (cmd) {
+                          await navigator.clipboard.writeText(cmd);
+                          setCopiedUpdateBash(true);
+                        }
+                      }}
+                      sx={{ textTransform: 'none', borderColor: '#e2e8f0', color: '#1e293b' }}
+                    >
+                      {copiedUpdateBash ? 'Comanda d\'actualització copiada!' : 'Copiar comanda d\'actualització YAML'}
+                    </Button>
+                  </Box>
+                  <Box
+                    component="pre"
+                    sx={{
+                      bgcolor: '#0f172a',
+                      color: '#38bdf8',
+                      p: 2,
+                      borderRadius: '8px',
+                      fontFamily: '"Roboto Mono", monospace',
+                      fontSize: 12,
+                      lineHeight: 1.55,
+                      overflowX: 'auto',
+                      m: 0,
+                    }}
+                  >
+                    {extractUpdateYamlCommand(yamlBundle?.install_commands)}
+                  </Box>
+                </Box>
+              )}
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ px: 3, py: 1.75, bgcolor: '#f8fafc', borderTop: '1px solid #e2e8f0' }}>
+          <Button
+            type="button"
+            onClick={() => setInstallModalServer(null)}
+            sx={{ textTransform: 'none', color: '#1e293b' }}
+          >
+            Tancar
+          </Button>
+          <Button
+            type="button"
+            variant="outlined"
+            onClick={() => {
+              const targetId = installModalServer?.id;
+              setInstallModalServer(null);
+              if (targetId) {
+                navigate(`/servers/${targetId}/config?tab=yaml`);
+              }
+            }}
+            sx={{ textTransform: 'none', borderColor: '#1976d2', color: '#1976d2' }}
+          >
+            Obrir vista completa `config.yaml` &amp; 4 Potetes
           </Button>
         </DialogActions>
       </Dialog>

@@ -5,6 +5,14 @@ Tots els canvis rellevants d'aquest projecte es documenten en aquest fitxer.
 El format es basa en [Keep a Changelog](https://keepachangelog.com/ca/1.0.0/),
 i aquest projecte segueix [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.2] - 2026-11-11
+
+### Added
+- **Secció i Modal "Instal·lació des del servidor" a Inventari i YAML (`frontend/`)**:
+  - Afegit botó directe **Instal·lació des del servidor** a cada fila de [`ServersListView.tsx`](frontend/src/modules/servers/views/ServersListView.tsx) que obre un modal amb el bloc Bash `curl` complet (binari + `config.yaml` amb `X-Agent-Key` + `systemd`) i la comanda ràpida per actualitzar només el `config.yaml` i reiniciar el servei.
+  - Afegit el bloc Bash d'instal·lació directe també al modal de creació/rotació d'`API Key` a [`ServersListView.tsx`](frontend/src/modules/servers/views/ServersListView.tsx).
+  - Reestructurada la pestanya **2. Instal·lació des del servidor & `config.yaml`** a [`ServerConfigYamlView.tsx`](frontend/src/modules/servers/views/ServerConfigYamlView.tsx) amb targeta principal destacada per copiar tot el Bash d'instal·lació o la comanda d'actualització del YAML amb un clic.
+
 ## [0.1.1] - 2026-11-11
 
 ### Added

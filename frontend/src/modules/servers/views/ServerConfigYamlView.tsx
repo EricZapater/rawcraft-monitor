@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Box,
   Typography,
@@ -100,6 +100,7 @@ function createDefaultConfig(): ServerMonitoringConfig {
 export const ServerConfigYamlView: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   const {
     currentServer,
@@ -115,7 +116,8 @@ export const ServerConfigYamlView: React.FC = () => {
   const { users, fetchUsers, currentUser } = useUsersStore();
   const isAdmin = currentUser?.role === 'ADMIN';
 
-  const [activeTab, setActiveTab] = useState<'form' | 'yaml'>('form');
+  const initialTab = searchParams.get('tab') === 'yaml' ? 'yaml' : 'form';
+  const [activeTab, setActiveTab] = useState<'form' | 'yaml'>(initialTab);
   const [serverName, setServerName] = useState('');
   const [serverDesc, setServerDesc] = useState('');
   const [config, setConfig] = useState<ServerMonitoringConfig>(createDefaultConfig);
@@ -134,6 +136,14 @@ export const ServerConfigYamlView: React.FC = () => {
   const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
   const [copiedYaml, setCopiedYaml] = useState(false);
   const [copiedInstall, setCopiedInstall] = useState(false);
+  const [copiedUpdate, setCopiedUpdate] = useState(false);
+
+  const extractUpdateYamlCommand = (installCmds?: string) => {
+    if (!installCmds) return '';
+    const match = installCmds.match(/sudo curl -fsSL -H "X-Agent-Key: [^"]+" [^\n]+/);
+    if (!match) return '';
+    return `${match[0]}\nsudo chmod 0600 /etc/rawcraft-agent/config.yaml\nsudo systemctl restart rawcraft-agent`;
+  };
 
   useEffect(() => {
     if (!id) return;
@@ -149,11 +159,15 @@ export const ServerConfigYamlView: React.FC = () => {
         setMountPointsText((cfg.host?.mount_points ?? ['/']).join(', '));
         setToEmailsText((cfg.smtp?.to_emails ?? []).join(', '));
       }
+      if (searchParams.get('tab') === 'yaml') {
+        setActiveTab('yaml');
+        await fetchConfigYaml(id);
+      }
       if (isAdmin) {
         void fetchUsers();
       }
     })();
-  }, [id, fetchServerById, fetchUsers, isAdmin]);
+  }, [id, fetchServerById, fetchConfigYaml, fetchUsers, isAdmin, searchParams]);
 
   const buildCleanedConfig = (): ServerMonitoringConfig => {
     const reqList = requiredContainersText
@@ -384,7 +398,7 @@ export const ServerConfigYamlView: React.FC = () => {
               borderColor: '#e2e8f0',
             }}
           >
-            2. Previsualització `config.yaml` &amp; `systemd`
+            2. Instal·lació des del servidor &amp; `config.yaml`
           </Button>
           {isAdmin && (
             <Button
@@ -1258,7 +1272,7 @@ export const ServerConfigYamlView: React.FC = () => {
           </Paper>
         </Box>
       ) : (
-        /* VISTA 2: PREVISUALITZACIÓ CONFIG.YAML I UNITAT SYSTEMD */
+        /* VISTA 2: INSTAL·LACIÓ DES DEL SERVIDOR, CONFIG.YAML I UNITAT SYSTEMD */
         <Box>
           <Box
             sx={{
@@ -1272,24 +1286,24 @@ export const ServerConfigYamlView: React.FC = () => {
           >
             <Box>
               <Typography component="h1" sx={{ fontSize: 21, fontWeight: 700, color: '#1e293b' }}>
-                Fitxer `config.yaml` i Servei `systemd` fora de Docker
+                Instal·lació des del servidor &amp; Fitxer `config.yaml`
               </Typography>
               <Typography sx={{ fontSize: 13, color: '#64748b', mt: 0.5 }}>
-                Fitxer autogenerat per al servidor <strong>{serverName}</strong> (`HU-SRV-03`, `HU-INF-04`).
+                Executa el bloc Bash per SSH a <strong>{serverName}</strong> per descarregar l&apos;agent, el seu `config.yaml` i el servei `systemd` via `curl` (`HU-SRV-03`, `HU-INF-04`).
               </Typography>
             </Box>
             <Box sx={{ display: 'flex', gap: 1.25, flexWrap: 'wrap' }}>
               <Button
-                variant="outlined"
+                variant="contained"
                 onClick={async () => {
                   if (yamlBundle?.install_commands) {
                     await navigator.clipboard.writeText(yamlBundle.install_commands);
                     setCopiedInstall(true);
                   }
                 }}
-                sx={{ textTransform: 'none', borderColor: '#e2e8f0', color: '#1e293b' }}
+                sx={{ textTransform: 'none', bgcolor: '#1976d2', fontWeight: 600 }}
               >
-                {copiedInstall ? 'Comandes curl copiades!' : 'Copiar Comandes `curl`'}
+                {copiedInstall ? 'Bash d\'instal·lació copiat!' : 'Copiar Bash d\'instal·lació (`curl`)'}
               </Button>
               <Button
                 variant="outlined"
@@ -1312,7 +1326,7 @@ export const ServerConfigYamlView: React.FC = () => {
                 Descarregar Binari `rawcraft-agent`
               </Button>
               <Button
-                variant="contained"
+                variant="outlined"
                 onClick={() => {
                   if (yamlBundle) {
                     triggerDownload(
@@ -1321,13 +1335,121 @@ export const ServerConfigYamlView: React.FC = () => {
                     );
                   }
                 }}
-                sx={{ textTransform: 'none', bgcolor: '#1976d2' }}
+                sx={{ textTransform: 'none', borderColor: '#e2e8f0', color: '#1e293b' }}
               >
                 Descarregar `{yamlBundle?.filename || `${serverName}-config.yaml`}`
               </Button>
             </Box>
           </Box>
 
+          {/* BLOC PRINCIPAL: INSTAL·LACIÓ DES DEL SERVIDOR (BASH CURL) */}
+          <Paper
+            elevation={0}
+            sx={{ border: '1px solid #cbd5e1', borderRadius: '10px', p: 2.5, mb: 2.5, bgcolor: '#f8fafc' }}
+          >
+            <Box
+              sx={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                mb: 1.5,
+                flexWrap: 'wrap',
+                gap: 1,
+              }}
+            >
+              <Box>
+                <Typography sx={{ fontSize: 15, fontWeight: 700, color: '#1e293b' }}>
+                  1. Instal·lació des del servidor (Executa aquest Bash per SSH a `{serverName}`)
+                </Typography>
+                <Typography sx={{ fontSize: 12.5, color: '#64748b' }}>
+                  Descarrega el binari Linux estàtic (`CGO_ENABLED=0`), el `config.yaml` autenticat amb l&apos;`X-Agent-Key` i arrenca la unitat `systemd`:
+                </Typography>
+              </Box>
+              <Button
+                type="button"
+                variant="contained"
+                size="small"
+                onClick={async () => {
+                  if (yamlBundle?.install_commands) {
+                    await navigator.clipboard.writeText(yamlBundle.install_commands);
+                    setCopiedInstall(true);
+                  }
+                }}
+                sx={{ textTransform: 'none', bgcolor: '#1976d2', fontWeight: 600 }}
+              >
+                {copiedInstall ? 'Bash copiat al porta-retalls!' : 'Copiar tot el Bash d\'instal·lació'}
+              </Button>
+            </Box>
+
+            <Box
+              component="pre"
+              sx={{
+                bgcolor: '#0f172a',
+                color: '#e2e8f0',
+                p: 2.5,
+                borderRadius: '8px',
+                fontFamily: '"Roboto Mono", monospace',
+                fontSize: 12.5,
+                lineHeight: 1.55,
+                overflowX: 'auto',
+                m: 0,
+              }}
+            >
+              {yamlBundle?.install_commands || 'Carregant comandes curl...'}
+            </Box>
+
+            {extractUpdateYamlCommand(yamlBundle?.install_commands) && (
+              <Box sx={{ mt: 2 }}>
+                <Box
+                  sx={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    mb: 1,
+                    flexWrap: 'wrap',
+                    gap: 1,
+                  }}
+                >
+                  <Typography sx={{ fontSize: 13.5, fontWeight: 700, color: '#1e293b' }}>
+                    Ja tens l&apos;agent instal·lat? Actualitza només el `config.yaml` i reinicia el servei:
+                  </Typography>
+                  <Button
+                    type="button"
+                    variant="outlined"
+                    size="small"
+                    onClick={async () => {
+                      const cmd = extractUpdateYamlCommand(yamlBundle?.install_commands);
+                      if (cmd) {
+                        await navigator.clipboard.writeText(cmd);
+                        setCopiedUpdate(true);
+                      }
+                    }}
+                    sx={{ textTransform: 'none', borderColor: '#cbd5e1', bgcolor: '#ffffff', color: '#1e293b' }}
+                  >
+                    {copiedUpdate ? 'Comanda d\'actualització copiada!' : 'Copiar comanda d\'actualització YAML'}
+                  </Button>
+                </Box>
+                <Box
+                  component="pre"
+                  sx={{
+                    bgcolor: '#0f172a',
+                    color: '#38bdf8',
+                    p: 2,
+                    borderRadius: '8px',
+                    fontFamily: '"Roboto Mono", monospace',
+                    fontSize: 12,
+                    lineHeight: 1.55,
+                    overflowX: 'auto',
+                    m: 0,
+                  }}
+                >
+                  {extractUpdateYamlCommand(yamlBundle?.install_commands)}
+                </Box>
+              </Box>
+            )}
+          </Paper>
+
+          {/* PREVISUALITZACIÓ DELS FITXERS */}
           <Box
             sx={{
               display: 'grid',
@@ -1337,7 +1459,7 @@ export const ServerConfigYamlView: React.FC = () => {
           >
             <Box>
               <Typography sx={{ fontSize: 14, fontWeight: 700, mb: 1 }}>
-                1. `/etc/rawcraft-agent/config.yaml`
+                2. Previsualització `/etc/rawcraft-agent/config.yaml`
               </Typography>
               <Box
                 component="pre"
@@ -1359,7 +1481,7 @@ export const ServerConfigYamlView: React.FC = () => {
 
             <Box>
               <Typography sx={{ fontSize: 14, fontWeight: 700, mb: 1 }}>
-                2. `/etc/systemd/system/rawcraft-agent.service` (Límit RAM 30MB)
+                3. Previsualització `/etc/systemd/system/rawcraft-agent.service` (Límit RAM 30MB)
               </Typography>
               <Box
                 component="pre"
@@ -1393,32 +1515,6 @@ CPUQuota=5%
 
 [Install]
 WantedBy=multi-user.target`}
-              </Box>
-
-              <Typography sx={{ fontSize: 14, fontWeight: 700, mt: 2.25, mb: 1 }}>
-                3. Comandes d&apos;instal·lació ràpida al servidor
-              </Typography>
-              <Box
-                component="pre"
-                sx={{
-                  bgcolor: '#0f172a',
-                  color: '#e2e8f0',
-                  p: 2.5,
-                  borderRadius: '8px',
-                  fontFamily: '"Roboto Mono", monospace',
-                  fontSize: 12.5,
-                  lineHeight: 1.55,
-                  overflowX: 'auto',
-                  m: 0,
-                }}
-              >
-                {yamlBundle?.install_commands ||
-                  `sudo install -m 0755 rawcraft-agent /usr/local/bin/rawcraft-agent
-sudo mkdir -p /etc/rawcraft-agent
-sudo cp ${serverName}-config.yaml /etc/rawcraft-agent/config.yaml
-sudo chmod 0600 /etc/rawcraft-agent/config.yaml
-sudo systemctl daemon-reload
-sudo systemctl enable --now rawcraft-agent`}
               </Box>
             </Box>
           </Box>
