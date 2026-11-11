@@ -1,0 +1,32 @@
+CHANGELOG.md
+  h_42175f19913982 8-14
+VERSION
+  h_42175f19913982 1
+backend/internal/alert/handler.go
+  h_42175f19913982 40,122-149
+backend/internal/alert/repository.go
+  h_42175f19913982 272-291
+backend/internal/alert/service.go
+  h_42175f19913982 126-179
+backend/internal/telemetry/service.go
+  h_42175f19913982 6,60-62,395-464
+contracts/alert.openapi.yaml
+  h_42175f19913982 265-298
+frontend/src/modules/alerts/api.ts
+  h_42175f19913982 22-26
+frontend/src/modules/alerts/store.ts
+  h_42175f19913982 18,69-83
+frontend/src/modules/alerts/views/AlertsView.tsx
+  h_42175f19913982 35,46,73-83,373-417,420
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "1ea28d97a6c2151d42daeb3ad8b091c416d6b772",
+  "prompts": {},
+  "humans": {
+    "h_42175f19913982": {
+      "author": "Èric Zapater <ericzm@ext.inditex.com>"
+    }
+  }
+}
