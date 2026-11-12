@@ -1,0 +1,46 @@
+CHANGELOG.md
+  h_42175f19913982 8-33
+VERSION
+  h_42175f19913982 1
+backend/cmd/api/main.go
+  h_42175f19913982 16,66-70,74-90,108
+backend/internal/agent/collector_logs.go
+  h_42175f19913982 1-249
+backend/internal/agent/collector_logs_test.go
+  h_42175f19913982 1-96
+backend/internal/agent/runner.go
+  h_42175f19913982 16,27,35-37,121-137
+backend/internal/containerlog/handler.go
+  h_42175f19913982 1-137
+backend/internal/containerlog/model.go
+  h_42175f19913982 1-50
+backend/internal/containerlog/repository.go
+  h_42175f19913982 1-171
+backend/internal/containerlog/service.go
+  h_42175f19913982 1-94
+backend/migrations/000003_create_container_logs.down.sql
+  h_42175f19913982 1-2
+backend/migrations/000003_create_container_logs.up.sql
+  h_42175f19913982 1-18
+contracts/telemetry.openapi.yaml
+  h_42175f19913982 21-101,816-932
+frontend/src/modules/telemetry/api.ts
+  h_42175f19913982 18-19,25-33,58-76
+frontend/src/modules/telemetry/components/ContainerLogsModal.tsx
+  h_42175f19913982 1-672
+frontend/src/modules/telemetry/types.ts
+  h_42175f19913982 93-143,148-180,617-712
+frontend/src/modules/telemetry/views/ServerDetailView.tsx
+  h_42175f19913982 22,218-219,222-226,744-770,847-849,855,921-940,1806-1815
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "c0b643713acafcc9764fc1a138e395b21f0354b3",
+  "prompts": {},
+  "humans": {
+    "h_42175f19913982": {
+      "author": "Èric Zapater <ericzm@ext.inditex.com>"
+    }
+  }
+}
