@@ -1,0 +1,22 @@
+CHANGELOG.md
+  h_42175f19913982 8-16
+VERSION
+  h_42175f19913982 1
+backend/internal/agent/evaluator.go
+  h_42175f19913982 17-22,24-33,196,234,296,323,355,508,513-516,529-537,539,542,545-567,585-620,622,626-636,639-643,645-651,667
+backend/internal/agent/evaluator_test.go
+  h_42175f19913982 92,95-101,104,186-270
+docs/agent-onboarding.md
+  h_42175f19913982 152-158
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "1bc8990a5f068008d2acfda4dfd7286999592d0a",
+  "prompts": {},
+  "humans": {
+    "h_42175f19913982": {
+      "author": "Èric Zapater <ericzm@ext.inditex.com>"
+    }
+  }
+}
