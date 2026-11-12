@@ -1,0 +1,14 @@
+docs/agent-onboarding.md
+  h_42175f19913982 1-233
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "bb8e097a3e9e97e772c40281f80060e619e04f17",
+  "prompts": {},
+  "humans": {
+    "h_42175f19913982": {
+      "author": "Èric Zapater <ericzm@ext.inditex.com>"
+    }
+  }
+}
