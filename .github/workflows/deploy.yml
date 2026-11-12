@@ -166,7 +166,7 @@ jobs:
       # Stage 3: Registrar Desplegament a RawCraft Monitor
       # -----------------------------------------------------------------------
       - name: 🚀 Registrar Desplegament a RawCraft Monitor
-        if: always() && secrets.RAWCRAFT_API_KEY != ''
+        if: always()
         env:
           RAWCRAFT_API_KEY: ${{ secrets.RAWCRAFT_API_KEY }}
           DEPLOY_VERSION: ${{ github.ref_name }}
@@ -176,6 +176,11 @@ jobs:
           DEPLOYED_BY: ${{ github.actor }}
           DEPLOY_STATUS: ${{ job.status == 'success' && 'SUCCESS' || 'FAILED' }}
         run: |
+          if [ -z "$RAWCRAFT_API_KEY" ]; then
+            echo "RAWCRAFT_API_KEY no configurada als secrets, ometent registre."
+            exit 0
+          fi
+
           if [ -z "$COMMIT_MESSAGE" ]; then
             COMMIT_MESSAGE=$(git log -1 --pretty=%B 2>/dev/null || true)
           fi
