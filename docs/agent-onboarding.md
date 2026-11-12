@@ -149,8 +149,13 @@ L'agent inclou una màquina d'estats en memòria dissenyada per evitar falsos po
 2. **Marges d'Histèresi (`HysteresisPercent = 5.0`)**:
    - Quan una alerta entra en estat `FIRING` (per exemple, RAM > 85%), no es tanca (`RESOLVED`) en el moment exacte en què la RAM baixa al 84.9%.
    - S'aplica un marge del 5%: l'alerta només es resol quan el valor baixa per sota de `85% - 5% = 80%`.
-3. **Alertes Crítiques Immediates**:
-   - Defectes d'alta disponibilitat com el dimoni de Docker aturat o un contenidor crític caigut tenen `sustained_checks = 1` i es notifiquen de forma instantània.
+3. **Finestra de Recuperació Sostinguda (`sustained_recovery`)**:
+   - Per evitar que serveis que moren en qüestió de segons tanquin falsament l'alerta, la recuperació d'un contenidor o endpoint requereix almenys 4 cicles d'estabilitat consecutius (~60s) en estat sa. Si torna a caure abans, el comptador es reinicia a zero i l'alerta roman oberta sense enviar correus redundants.
+4. **Detecció de CrashLoop / Flapping (`FlappingThreshold = 3`, `FlappingWindow = 10m`)**:
+   - Si un contenidor o servei canvia d'estat a fallit 3 o més vegades en una finestra de 10 minuts, l'agent el declara en CrashLoop (`⚠️ [CrashLoop / Flapping]`).
+   - S'emet un únic avís informatiu, es congelen les notificacions repetitives per evitar tempesta de correus, i s'exigeix el doble d'estabilitat sostinguda (8 cicles = 2 minuts) per donar-lo per resolt.
+5. **Alertes Crítiques Immediates**:
+   - Defectes d'alta disponibilitat com el dimoni de Docker aturat o un contenidor crític caigut per primer cop tenen `sustained_checks = 1` i es notifiquen de forma instantània.
 
 ---
 

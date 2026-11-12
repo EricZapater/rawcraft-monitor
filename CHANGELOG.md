@@ -5,6 +5,15 @@ Tots els canvis rellevants d'aquest projecte es documenten en aquest fitxer.
 El format es basa en [Keep a Changelog](https://keepachangelog.com/ca/1.0.0/),
 i aquest projecte segueix [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.1] - 2026-11-12
+
+### Added
+- **Detecció de CrashLoop / Flapping & Finestra de Recuperació Sostinguda a l'Agent ([`evaluator.go`](backend/internal/agent/evaluator.go))**:
+  - **Finestra de Recuperació Sostinguda (`sustained_recovery`)**: Perquè un contenidor o servei es doni per recuperat (`RESOLVED`), ja no n'hi ha prou amb estar viu en 1 sol cicle. Ha de mantenir-se en estat `running` i `healthy` durant almenys 4 comprovacions consecutives (~60 segons d'estabilitat real). Si torna a caure abans, el comptador es reinicia i l'alerta es manté oberta en silenci sense duplicar correus.
+  - **Detecció Automàtica de CrashLoop / Flapping**: Si un contenidor canvia d'estat $\ge 3$ vegades en una finestra de 10 minuts (`FlappingWindow`), l'agent el marca oficialment com a `⚠️ [CrashLoop / Flapping]`.
+  - **Anti-Spam de Notificacions**: Quan es detecta CrashLoop, l'agent envia una única notificació informativa de bucle de reinicis i congela qualsevol notificació redundant de caiguda o recuperació prematura.
+  - **Recuperació Reforçada**: En estat de Flapping, s'exigeix el doble de comprovacions estables sostingudes (8 cicles = 2 minuts completament sa) abans de donar l'incident per resolt i tancar l'alerta.
+
 ## [0.3.0] - 2026-11-12
 
 ### Added

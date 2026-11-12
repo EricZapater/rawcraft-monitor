@@ -89,12 +89,19 @@ func TestEvaluator_DockerAndHttpTransitions(t *testing.T) {
 		t.Fatalf("s'esperava alerta FIRING per a nasc-backend, rebut: %+v", events)
 	}
 
-	// Recuperació del contenidor
+	// Recuperació sostinguda del contenidor (requereix 4 comprovacions consecutives per evitar flapping)
 	dockerSnap.Containers[0].State = "running"
 	dockerSnap.Containers[0].Health = "healthy"
+	for i := 1; i <= 3; i++ {
+		events = eval.Evaluate(cfg, nil, dockerSnap, nil, nil)
+		if len(events) != 0 {
+			t.Fatalf("comprovació de recuperació %d: no s'havia de resoldre prematurament, rebut: %+v", i, events)
+		}
+	}
+	// A la 4a comprovació sostinguda passa a RESOLVED
 	events = eval.Evaluate(cfg, nil, dockerSnap, nil, nil)
 	if len(events) != 1 || events[0].Status != alert.StatusResolved {
-		t.Fatalf("s'esperava alerta RESOLVED per a nasc-backend, rebut: %+v", events)
+		t.Fatalf("a la 4a comprovació s'esperava alerta RESOLVED per a nasc-backend, rebut: %+v", events)
 	}
 
 	// Si es defineix RequiredContainers, un contenidor aliè caigut NO ha de disparar alerta
@@ -176,3 +183,88 @@ api_key: "rcm_live_test"
 		t.Errorf("socket_path per defecte inesperat: %s", cfg.Docker.SocketPath)
 	}
 }
+
+func TestEvaluator_ContainerFlappingAndCrashLoop(t *testing.T) {
+	eval := NewEvaluator()
+	cfg := &Config{
+		ServerID:   uuid.New().String(),
+		ServerName: "prod-node-01",
+		Docker: server.DockerPillarConfig{
+			Enabled:              true,
+			AlertOnContainerDown: true,
+		},
+	}
+
+	downSnap := &telemetry.DockerMetricsSnapshot{
+		DockerDaemonUp: true,
+		Containers: []telemetry.DockerContainerSnapshot{
+			{Name: "app-service", State: "exited", Health: "none"},
+		},
+	}
+	upSnap := &telemetry.DockerMetricsSnapshot{
+		DockerDaemonUp: true,
+		Containers: []telemetry.DockerContainerSnapshot{
+			{Name: "app-service", State: "running", Health: "healthy"},
+		},
+	}
+
+	// 1. Primera caiguda -> Dispara FIRING normal
+	events := eval.Evaluate(cfg, nil, downSnap, nil, nil)
+	if len(events) != 1 || events[0].Status != alert.StatusFiring {
+		t.Fatalf("esperava FIRING inicial, obtingut: %+v", events)
+	}
+
+	// 2. S'arrenca 1 cop (comprovant la BD) -> NO s'ha d'emetre RESOLVED (sosteniment pendent)
+	events = eval.Evaluate(cfg, nil, upSnap, nil, nil)
+	if len(events) != 0 {
+		t.Fatalf("no s'havia d'emetre RESOLVED prematurament, obtingut: %+v", events)
+	}
+
+	// 3. Torna a caure (2a caiguda) -> No ha de repetir FIRING ni spamejar
+	events = eval.Evaluate(cfg, nil, downSnap, nil, nil)
+	if len(events) != 0 {
+		t.Fatalf("no s'havia de repetir FIRING durant el crashloop, obtingut: %+v", events)
+	}
+
+	// 4. S'arrenca de nou
+	events = eval.Evaluate(cfg, nil, upSnap, nil, nil)
+	if len(events) != 0 {
+		t.Fatalf("no s'havia d'emetre RESOLVED, obtingut: %+v", events)
+	}
+
+	// 5. Torna a caure (3a caiguda en <10m) -> Ha de detectar CrashLoop/Flapping!
+	events = eval.Evaluate(cfg, nil, downSnap, nil, nil)
+	if len(events) != 1 || events[0].Status != alert.StatusFiring {
+		t.Fatalf("esperava alerta de CrashLoop, obtingut: %+v", events)
+	}
+	if events[0].Title != "⚠️ [CrashLoop / Flapping] Contenidor Docker app-service caigut o unhealthy" {
+		t.Errorf("títol de CrashLoop inesperat: %s", events[0].Title)
+	}
+
+	// 6. Continua caient i reiniciant-se -> Zero spam!
+	for i := 0; i < 5; i++ {
+		events = eval.Evaluate(cfg, nil, upSnap, nil, nil)
+		if len(events) != 0 {
+			t.Fatalf("mentre fa flapping no ha d'emetre resolucions flappejants")
+		}
+		events = eval.Evaluate(cfg, nil, downSnap, nil, nil)
+		if len(events) != 0 {
+			t.Fatalf("mentre fa flapping no ha d'emetre nous alertes duplicades")
+		}
+	}
+
+	// 7. Finalment s'arregla la BD: calen 8 comprovacions estables (neededRecovery = 4 * 2)
+	for i := 1; i <= 7; i++ {
+		events = eval.Evaluate(cfg, nil, upSnap, nil, nil)
+		if len(events) != 0 {
+			t.Fatalf("a la comprovació %d encara no s'havia de resoldre el flapping", i)
+		}
+	}
+
+	// Comprovació 8 -> Passa a RESOLVED
+	events = eval.Evaluate(cfg, nil, upSnap, nil, nil)
+	if len(events) != 1 || events[0].Status != alert.StatusResolved {
+		t.Fatalf("a la 8a comprovació s'havia de resoldre definitivament, obtingut: %+v", events)
+	}
+}
+

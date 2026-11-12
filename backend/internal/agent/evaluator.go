@@ -14,14 +14,23 @@ import (
 // HysteresisPercent és el marge d'histèresi (5%) per evitar oscil·lacions entre FIRING i RESOLVED.
 const HysteresisPercent = 5.0
 
+// FlappingWindow és la finestra de temps (10 minuts) per avaluar si un recurs està en bucle de reinicis (CrashLoop / Flapping).
+const FlappingWindow = 10 * time.Minute
+
+// FlappingThreshold és el nombre de caigudes en la finestra de flapping per declarar l'alerta com a CrashLoop.
+const FlappingThreshold = 3
+
 type ruleState struct {
-	consecutiveBreaches int
-	firing              bool
-	category            alert.AlertCategory
-	severity            alert.AlertSeverity
-	targetName          string
-	title               string
-	thresholdValue      string
+	consecutiveBreaches  int
+	consecutiveSuccesses int
+	firing               bool
+	isFlapping           bool
+	failureTimes         []time.Time
+	category             alert.AlertCategory
+	severity             alert.AlertSeverity
+	targetName           string
+	title                string
+	thresholdValue       string
 }
 
 // Evaluator manté l'estat en memòria de cada regla (per fingerprint) per aplicar finestra de sosteniment i histèresi.
@@ -184,6 +193,7 @@ func (e *Evaluator) Evaluate(
 			"Dimoni Docker inabastable",
 			!docker.DockerDaemonUp,
 			1,
+			2,
 			"DOWN",
 			"UP",
 			now,
@@ -221,6 +231,7 @@ func (e *Evaluator) Evaluate(
 							fmt.Sprintf("Contenidor Docker %s caigut o unhealthy", c.Name),
 							isDown,
 							1,
+							4,
 							curState,
 							"running",
 							now,
@@ -282,6 +293,7 @@ func (e *Evaluator) Evaluate(
 						fmt.Sprintf("Contenidor obligatori %s no trobat", reqName),
 						true,
 						1,
+						4,
 						"missing",
 						"running",
 						now,
@@ -307,6 +319,7 @@ func (e *Evaluator) Evaluate(
 			ep.Name,
 			fmt.Sprintf("Endpoint HTTP %s no respon amb codi esperat", ep.Name),
 			!ep.Up,
+			2,
 			2,
 			curVal,
 			fmt.Sprintf("%v", ep.ExpectedStatusCodes),
@@ -339,6 +352,7 @@ func (e *Evaluator) Evaluate(
 				fmt.Sprintf("Instància PostgreSQL %s inabastable", pg.Name),
 				!pg.Up,
 				1,
+				2,
 				curDown,
 				"UP (SELECT 1)",
 				now,
@@ -491,10 +505,15 @@ func (e *Evaluator) evalBooleanDownRule(
 	title string,
 	isFailing bool,
 	requiredSustained int,
+	requiredRecovery int,
 	currentVal string,
 	expectedVal string,
 	now time.Time,
 ) *alert.AgentAlertEventRequest {
+	if requiredRecovery <= 0 {
+		requiredRecovery = 1
+	}
+
 	st, ok := e.states[fingerprint]
 	if !ok {
 		st = &ruleState{
@@ -507,11 +526,45 @@ func (e *Evaluator) evalBooleanDownRule(
 		e.states[fingerprint] = st
 	}
 
+	// Netejar fallades fora de la finestra de flapping (10 minuts)
+	cleanFailures := make([]time.Time, 0, len(st.failureTimes))
+	for _, t := range st.failureTimes {
+		if now.Sub(t) <= FlappingWindow {
+			cleanFailures = append(cleanFailures, t)
+		}
+	}
+	st.failureTimes = cleanFailures
+
 	if !st.firing {
+		// CAS 1: Actualment en estat normal (OK)
 		if isFailing {
 			st.consecutiveBreaches++
+			st.consecutiveSuccesses = 0
 			if st.consecutiveBreaches >= requiredSustained {
 				st.firing = true
+				st.failureTimes = append(st.failureTimes, now)
+
+				// Comprovar si entra immediatament en CrashLoop / Flapping
+				if len(st.failureTimes) >= FlappingThreshold {
+					st.isFlapping = true
+					flappingTitle := fmt.Sprintf("⚠️ [CrashLoop / Flapping] %s", title)
+					msg := fmt.Sprintf("%s: detectat bucle de reinicis continu (CrashLoop). S'han registrat %d caigudes en menys de 10 minuts. Estat actual '%s' (esperat: '%s'). L'alerta es mantindrà oberta fins a estabilitat sostinguda.",
+						title, len(st.failureTimes), currentVal, expectedVal)
+					return &alert.AgentAlertEventRequest{
+						ServerID:       serverID,
+						Fingerprint:    fingerprint,
+						Status:         alert.StatusFiring,
+						Category:       category,
+						Severity:       severity,
+						TargetName:     targetName,
+						Title:          flappingTitle,
+						Message:        msg,
+						CurrentValue:   &currentVal,
+						ThresholdValue: &expectedVal,
+						OccurredAt:     now,
+					}
+				}
+
 				msg := fmt.Sprintf("%s: estat actual '%s' (esperat: '%s').", title, currentVal, expectedVal)
 				return &alert.AgentAlertEventRequest{
 					ServerID:       serverID,
@@ -529,15 +582,73 @@ func (e *Evaluator) evalBooleanDownRule(
 			}
 		} else {
 			st.consecutiveBreaches = 0
+			st.consecutiveSuccesses++
+			if st.consecutiveSuccesses >= requiredRecovery*2 {
+				st.isFlapping = false
+			}
 		}
 		return nil
 	}
 
-	if !isFailing {
+	// CAS 2: Actualment en estat d'alerta (FIRING)
+	if isFailing {
+		st.consecutiveBreaches++
+		// Si estàvem comptant èxits per recuperar-lo i ha tornat a caure de sobte!
+		if st.consecutiveSuccesses > 0 {
+			st.consecutiveSuccesses = 0
+			st.failureTimes = append(st.failureTimes, now)
+
+			// Si assoleix el llindar de flapping i encara no estava marcat, notifiquem el pas a CrashLoop
+			if len(st.failureTimes) >= FlappingThreshold && !st.isFlapping {
+				st.isFlapping = true
+				flappingTitle := fmt.Sprintf("⚠️ [CrashLoop / Flapping] %s", title)
+				msg := fmt.Sprintf("%s: detectat bucle de reinicis continu (CrashLoop). S'han registrat %d caigudes en menys de 10 minuts. Estat actual '%s'. L'alerta es mantindrà oberta congelant notificacions fins a estabilitat sostinguda.",
+					title, len(st.failureTimes), currentVal)
+				return &alert.AgentAlertEventRequest{
+					ServerID:       serverID,
+					Fingerprint:    fingerprint,
+					Status:         alert.StatusFiring,
+					Category:       category,
+					Severity:       severity,
+					TargetName:     targetName,
+					Title:          flappingTitle,
+					Message:        msg,
+					CurrentValue:   &currentVal,
+					ThresholdValue: &expectedVal,
+					OccurredAt:     now,
+				}
+			}
+		}
+		// Es manté FIRING sense reenviar correus innecessaris
+		return nil
+	}
+
+	// isFailing és FALSE: El recurs s'ha aixecat o respon OK
+	st.consecutiveBreaches = 0
+	st.consecutiveSuccesses++
+
+	neededRecovery := requiredRecovery
+	if st.isFlapping {
+		// En estat CrashLoop / Flapping cal el doble de comprovacions consecutives estables
+		neededRecovery = requiredRecovery * 2
+	}
+
+	if st.consecutiveSuccesses >= neededRecovery {
 		st.firing = false
 		st.consecutiveBreaches = 0
+		st.consecutiveSuccesses = 0
+		wasFlapping := st.isFlapping
+		st.isFlapping = false
+		st.failureTimes = nil
+
 		resolvedTitle := fmt.Sprintf("Recuperat: %s", title)
-		msg := fmt.Sprintf("El recurs %s s'ha restablert correctament (estat actual: '%s').", targetName, currentVal)
+		msg := fmt.Sprintf("El recurs %s s'ha restablert correctament i s'ha mantingut sa durant %d comprovacions consecutives (estat actual: '%s').",
+			targetName, neededRecovery, currentVal)
+		if wasFlapping {
+			msg = fmt.Sprintf("El recurs %s s'ha estabilitzat completament després del bucle de reinicis (CrashLoop) i s'ha mantingut sa durant %d comprovacions consecutives (estat actual: '%s').",
+				targetName, neededRecovery, currentVal)
+		}
+
 		return &alert.AgentAlertEventRequest{
 			ServerID:       serverID,
 			Fingerprint:    fingerprint,
@@ -553,5 +664,6 @@ func (e *Evaluator) evalBooleanDownRule(
 		}
 	}
 
+	// Encara no compleix els cicles d'estabilitat exigits: no fem res i l'alerta segueix oberta en silenci
 	return nil
 }
