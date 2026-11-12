@@ -5,6 +5,20 @@ Tots els canvis rellevants d'aquest projecte es documenten en aquest fitxer.
 El format es basa en [Keep a Changelog](https://keepachangelog.com/ca/1.0.0/),
 i aquest projecte segueix [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.2] - 2026-11-12
+
+### Fixed
+- **Extracció de codi de sortida a Docker (`collector_docker.go`)**:
+  - `parseDockerExitCode`: Extreu el codi d'error numèric de sortida de Docker (p. ex. `139` per a SIGSEGV, `137` per a OOM) a partir de la cadena de status del dimoni (`Restarting (139)...` o `Exited (139)...`), en lloc de deixar `ExitCode: 0`.
+- **Detecció immediata d'estat `restarting` & Escalada a CrashLoop (`evaluator.go`)**:
+  - Els contenidors en estat `restarting` es classifiquen immediatament com a incident actiu i, si persisteixen més de 2 cicles consecutius en reinici continu, l'agent activa de forma instantània la notificació de `⚠️ [CrashLoop / Flapping]`.
+- **Estat del servidor a CRITICAL per contenidors en error (`telemetry/service.go`)**:
+  - `evaluateServerStatusFromSnapshot` ara avalua l'estat de tots els contenidors reportats al snapshot. Si algun contenidor està en `restarting`, `dead`, `unhealthy` o `exited` amb codi d'error, el servidor passa immediatament a estat `CRITICAL` (llum vermella al Dashboard i a la fitxa de detall).
+- **Notificació per correu electrònic en canvis d'escalada o CrashLoop (`alert/repository.go`)**:
+  - `UpsertFiringAlert`: Si una alerta ja existia com a `FIRING` a la base de dades però ha escalat o ha canviat a `CrashLoop`, ara es marca com a transició d'estat per enviar el correu d'avís de reinicis continuats.
+- **Ressaltat visual de contenidors en CrashLoop (`ServerDetailView.tsx`)**:
+  - La fila del contenidor es ressalta amb fons d'alerta i mostra l'etiqueta `⚠️ CrashLoop` al costat del nom i `⚠️ restarting [codi 139]` a la columna d'estat.
+
 ## [0.3.1] - 2026-11-12
 
 ### Fixed

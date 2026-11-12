@@ -859,10 +859,31 @@ export const ServerDetailView: React.FC = () => {
                 ) : (
                   paginatedContainers.map((c) => {
                     const isOk = c.state === 'running' && c.health !== 'unhealthy';
+                    const isRestarting = c.state === 'restarting';
                     return (
-                      <tr key={c.container_id || c.name} style={{ borderBottom: '1px solid #e2e8f0' }}>
+                      <tr key={c.container_id || c.name} style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: isRestarting ? '#fff5f5' : 'inherit' }}>
                         <td style={{ padding: '12px 16px', fontFamily: '"Roboto Mono", monospace', fontWeight: 700 }}>
-                          {c.name}
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <span>{c.name}</span>
+                            {isRestarting && (
+                              <Box
+                                component="span"
+                                sx={{
+                                  fontSize: 10,
+                                  fontWeight: 700,
+                                  color: '#b91c1c',
+                                  bgcolor: '#fee2e2',
+                                  border: '1px solid #fca5a5',
+                                  px: 0.7,
+                                  py: 0.15,
+                                  borderRadius: '4px',
+                                  whiteSpace: 'nowrap',
+                                }}
+                              >
+                                ⚠️ CrashLoop
+                              </Box>
+                            )}
+                          </Box>
                         </td>
                         <td style={{ padding: '12px 16px', fontFamily: '"Roboto Mono", monospace', fontSize: 12 }}>
                           {c.image}
@@ -876,17 +897,20 @@ export const ServerDetailView: React.FC = () => {
                               py: 0.35,
                               borderRadius: '12px',
                               fontSize: 11,
-                              fontWeight: 600,
-                              bgcolor: isOk ? '#dcfce7' : '#fee2e2',
-                              color: isOk ? '#166534' : '#991b1b',
+                              fontWeight: 700,
+                              bgcolor: isRestarting ? '#fecaca' : isOk ? '#dcfce7' : '#fee2e2',
+                              color: isRestarting ? '#991b1b' : isOk ? '#166534' : '#991b1b',
+                              border: isRestarting ? '1px solid #f87171' : 'none',
                             }}
                           >
-                            {c.state}
+                            {isRestarting ? '⚠️ restarting' : c.state}
                             {c.health && c.health !== 'none' ? ` (${c.health})` : ''}
-                            {!isOk && c.exit_code ? ` [${c.exit_code}]` : ''}
+                            {!isOk && c.exit_code ? ` [codi ${c.exit_code}]` : ''}
                           </Box>
                         </td>
-                        <td style={{ padding: '12px 16px' }}>{c.status}</td>
+                        <td style={{ padding: '12px 16px', color: isRestarting ? '#991b1b' : 'inherit', fontWeight: isRestarting ? 600 : 400 }}>
+                          {c.status}
+                        </td>
                         <td style={{ padding: '12px 16px', fontFamily: '"Roboto Mono", monospace', fontSize: 12 }}>
                           {c.cpu_percent.toFixed(1)}%
                         </td>

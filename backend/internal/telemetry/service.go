@@ -94,6 +94,16 @@ func evaluateServerStatusFromSnapshot(req TelemetryIngestRequest, firingAlerts i
 	if req.Docker != nil && !req.Docker.DockerDaemonUp {
 		return server.StatusCritical
 	}
+	if req.Docker != nil {
+		for _, c := range req.Docker.Containers {
+			if c.State == "restarting" || c.State == "dead" || c.Health == "unhealthy" {
+				return server.StatusCritical
+			}
+			if c.State == "exited" && c.ExitCode != 0 {
+				return server.StatusCritical
+			}
+		}
+	}
 	for _, ep := range req.HttpEndpoints {
 		if !ep.Up {
 			return server.StatusCritical

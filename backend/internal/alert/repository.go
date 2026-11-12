@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -80,6 +81,9 @@ func (r *Repository) UpsertFiringAlert(ctx context.Context, req AgentAlertEventR
 	}
 
 	if existing != nil {
+		significantChange := existing.Severity != req.Severity ||
+			(!strings.Contains(existing.Title, "CrashLoop") && strings.Contains(req.Title, "CrashLoop"))
+
 		_, err := r.pool.Exec(ctx, `
 			UPDATE alerts
 			SET severity = $1,
@@ -94,7 +98,7 @@ func (r *Repository) UpsertFiringAlert(ctx context.Context, req AgentAlertEventR
 			return nil, false, err
 		}
 		updated, err := r.GetByID(ctx, existing.ID)
-		return updated, false, err
+		return updated, significantChange, err
 	}
 
 	newID := uuid.New()

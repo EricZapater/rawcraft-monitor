@@ -7,6 +7,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -209,7 +210,7 @@ func CollectDockerMetrics(ctx context.Context, cfg server.DockerPillarConfig) *t
 					State:       state,
 					Status:      rc.Status,
 					Health:      health,
-					ExitCode:    0,
+					ExitCode:    parseDockerExitCode(rc.Status),
 				})
 			} else {
 				snapshots = append(snapshots, telemetry.DockerContainerSnapshot{
@@ -250,7 +251,7 @@ func CollectDockerMetrics(ctx context.Context, cfg server.DockerPillarConfig) *t
 				State:       state,
 				Status:      rc.Status,
 				Health:      health,
-				ExitCode:    0,
+				ExitCode:    parseDockerExitCode(rc.Status),
 			})
 		}
 	}
@@ -361,6 +362,23 @@ func parseDockerHealthFromStatus(status string) string {
 	default:
 		return "none"
 	}
+}
+
+func parseDockerExitCode(status string) int {
+	start := strings.IndexByte(status, '(')
+	if start == -1 {
+		return 0
+	}
+	end := strings.IndexByte(status[start+1:], ')')
+	if end == -1 {
+		return 0
+	}
+	codeStr := strings.TrimSpace(status[start+1 : start+1+end])
+	code, err := strconv.Atoi(codeStr)
+	if err != nil {
+		return 0
+	}
+	return code
 }
 
 func normalizeDockerState(state string) string {

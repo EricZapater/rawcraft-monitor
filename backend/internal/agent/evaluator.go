@@ -222,13 +222,24 @@ func (e *Evaluator) Evaluate(
 					if shouldAlertDown {
 						isDown := c.State != "running" || c.Health == "unhealthy"
 						curState := fmt.Sprintf("%s (%s)", c.State, c.Health)
+						title := fmt.Sprintf("Contenidor Docker %s caigut o unhealthy", c.Name)
+						if c.ExitCode > 0 {
+							curState = fmt.Sprintf("%s (codi sortida: %d, health: %s)", c.State, c.ExitCode, c.Health)
+						}
+						if c.State == "restarting" {
+							if c.ExitCode > 0 {
+								title = fmt.Sprintf("⚠️ Contenidor Docker %s en reinici continu (Restarting, codi %d)", c.Name, c.ExitCode)
+							} else {
+								title = fmt.Sprintf("⚠️ Contenidor Docker %s en reinici continu (Restarting)", c.Name)
+							}
+						}
 						if ev := e.evalBooleanDownRule(
 							serverUUID,
 							fmt.Sprintf("docker:container:%s", c.Name),
 							alert.CategoryDocker,
 							alert.SeverityCritical,
 							c.Name,
-							fmt.Sprintf("Contenidor Docker %s caigut o unhealthy", c.Name),
+							title,
 							isDown,
 							1,
 							4,
@@ -597,26 +608,27 @@ func (e *Evaluator) evalBooleanDownRule(
 		if st.consecutiveSuccesses > 0 {
 			st.consecutiveSuccesses = 0
 			st.failureTimes = append(st.failureTimes, now)
+		}
 
-			// Si assoleix el llindar de flapping i encara no estava marcat, notifiquem el pas a CrashLoop
-			if len(st.failureTimes) >= FlappingThreshold && !st.isFlapping {
-				st.isFlapping = true
-				flappingTitle := fmt.Sprintf("⚠️ [CrashLoop / Flapping] %s", title)
-				msg := fmt.Sprintf("%s: detectat bucle de reinicis continu (CrashLoop). S'han registrat %d caigudes en menys de 10 minuts. Estat actual '%s'. L'alerta es mantindrà oberta congelant notificacions fins a estabilitat sostinguda.",
-					title, len(st.failureTimes), currentVal)
-				return &alert.AgentAlertEventRequest{
-					ServerID:       serverID,
-					Fingerprint:    fingerprint,
-					Status:         alert.StatusFiring,
-					Category:       category,
-					Severity:       severity,
-					TargetName:     targetName,
-					Title:          flappingTitle,
-					Message:        msg,
-					CurrentValue:   &currentVal,
-					ThresholdValue: &expectedVal,
-					OccurredAt:     now,
-				}
+		// Si el contenidor està en bucle 'restarting' o assoleix el llindar de flapping
+		isRestartingLoop := strings.Contains(strings.ToLower(currentVal), "restarting") && st.consecutiveBreaches >= 2
+		if (len(st.failureTimes) >= FlappingThreshold || isRestartingLoop) && !st.isFlapping {
+			st.isFlapping = true
+			flappingTitle := fmt.Sprintf("⚠️ [CrashLoop / Flapping] %s", title)
+			msg := fmt.Sprintf("%s: detectat bucle de reinicis continu (CrashLoop). Estat actual '%s'. L'alerta es mantindrà oberta congelant notificacions fins a estabilitat sostinguda.",
+				title, currentVal)
+			return &alert.AgentAlertEventRequest{
+				ServerID:       serverID,
+				Fingerprint:    fingerprint,
+				Status:         alert.StatusFiring,
+				Category:       category,
+				Severity:       severity,
+				TargetName:     targetName,
+				Title:          flappingTitle,
+				Message:        msg,
+				CurrentValue:   &currentVal,
+				ThresholdValue: &expectedVal,
+				OccurredAt:     now,
 			}
 		}
 		// Es manté FIRING sense reenviar correus innecessaris
