@@ -13,6 +13,7 @@ import (
 	"github.com/joho/godotenv"
 
 	"rawcraft-monitor/backend/internal/alert"
+	"rawcraft-monitor/backend/internal/containerlog"
 	"rawcraft-monitor/backend/internal/db"
 	"rawcraft-monitor/backend/internal/server"
 	"rawcraft-monitor/backend/internal/shared"
@@ -62,9 +63,30 @@ func main() {
 	telemetryService := telemetry.NewService(telemetryRepo, serverService, alertService, userService)
 	telemetryHandler := telemetry.NewHandler(telemetryService, serverService.ValidateAgentKey)
 
-	// Workers en segon pla: Heartbeat cada minut i Purga diària de retenció (365 dies per defecte)
+	logRepo := containerlog.NewRepository(pool)
+	logService := containerlog.NewService(logRepo, serverService)
+	logHandler := containerlog.NewHandler(logService, serverService.ValidateAgentKey)
+
+	// Workers en segon pla: Heartbeat cada minut, Purga diària de telemetria i Purga de logs (30 dies)
 	alertService.StartHeartbeatWorker(ctx)
 	telemetryService.StartRetentionWorker(ctx)
+
+	go func() {
+		// Purga diària de container_logs (> 30 dies)
+		ticker := time.NewTicker(24 * time.Hour)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				deleted, err := logService.Purge(ctx, 30)
+				if err == nil && deleted > 0 {
+					log.Printf("[retention] Purga de container_logs (>30 dies): %d línies eliminades", deleted)
+				}
+			}
+		}
+	}()
 
 	router := gin.Default()
 	router.Use(shared.CORSMiddleware())
@@ -83,6 +105,7 @@ func main() {
 		serverHandler.RegisterRoutes(v1)
 		telemetryHandler.RegisterRoutes(v1)
 		alertHandler.RegisterRoutes(v1)
+		logHandler.RegisterRoutes(v1)
 	}
 
 	port := os.Getenv("PORT")

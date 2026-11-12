@@ -90,10 +90,94 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/agent/logs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Ingesta un lot de línies de logs de contenidors enviat per l'agent */
+        post: operations["ingestContainerLogs"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/servers/{id}/logs/containers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Llista els contenidors amb logs emmagatzemats per a aquest servidor */
+        get: operations["listLogContainers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/servers/{id}/containers/{name}/logs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Consulta els logs d'un contenidor amb filtres i cerca de text */
+        get: operations["getContainerLogs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        ContainerLogEntry: {
+            /** Format: int64 */
+            id: number;
+            /** Format: uuid */
+            server_id: string;
+            container_name: string;
+            /** @enum {string} */
+            stream: "stdout" | "stderr";
+            /** Format: date-time */
+            timestamp: string;
+            message: string;
+            /** Format: date-time */
+            created_at?: string;
+        };
+        ContainerLogsResponse: {
+            /** Format: uuid */
+            server_id: string;
+            container_name: string;
+            total: number;
+            entries: components["schemas"]["ContainerLogEntry"][];
+        };
+        IngestLogItem: {
+            container_name: string;
+            stream?: string;
+            /** Format: date-time */
+            timestamp: string;
+            message: string;
+        };
+        IngestContainerLogsRequest: {
+            /** Format: uuid */
+            server_id: string;
+            entries: components["schemas"]["IngestLogItem"][];
+        };
         DiskMountUsage: {
             mount_point: string;
             /** Format: double */
@@ -526,6 +610,102 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    ingestContainerLogs: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IngestContainerLogsRequest"];
+            };
+        };
+        responses: {
+            /** @description Logs ingerits correctament */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Format de logs invàlid */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Clau d'agent no vàlida */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    listLogContainers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Llista de contenidors */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        server_id?: string;
+                        containers?: string[];
+                    };
+                };
+            };
+        };
+    };
+    getContainerLogs: {
+        parameters: {
+            query?: {
+                limit?: number;
+                stream?: "all" | "stdout" | "stderr";
+                search?: string;
+                since?: string;
+                until?: string;
+                order?: "desc" | "asc";
+            };
+            header?: never;
+            path: {
+                id: string;
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Logs del contenidor */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContainerLogsResponse"];
                 };
             };
         };

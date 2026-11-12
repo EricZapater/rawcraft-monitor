@@ -15,10 +15,21 @@ export type TelemetryHistoryPoint = components['schemas']['TelemetryHistoryPoint
 export type ServerHistoryResponse = components['schemas']['ServerHistoryResponse'];
 export type RetentionSettings = components['schemas']['RetentionSettings'];
 export type UpdateRetentionRequest = components['schemas']['UpdateRetentionRequest'];
+export type ContainerLogEntry = components['schemas']['ContainerLogEntry'];
+export type ContainerLogsResponse = components['schemas']['ContainerLogsResponse'];
 export type TelemetryErrorResponse = components['schemas']['ErrorResponse'];
 export type HistoryRange = NonNullable<
   NonNullable<operations['getServerTelemetryHistory']['parameters']['query']>['range']
 >;
+
+export interface ContainerLogsQueryParams {
+  limit?: number;
+  stream?: 'all' | 'stdout' | 'stderr';
+  search?: string;
+  since?: string;
+  until?: string;
+  order?: 'desc' | 'asc';
+}
 
 export const telemetryApi = {
   async getDashboardOverview(): Promise<DashboardOverviewResponse> {
@@ -39,6 +50,25 @@ export const telemetryApi = {
   ): Promise<ServerHistoryResponse> {
     const { data } = await apiClient.get<ServerHistoryResponse>(
       `/servers/${serverId}/telemetry/history`,
+      { params }
+    );
+    return data;
+  },
+
+  async listLogContainers(serverId: string): Promise<{ server_id: string; containers: string[] }> {
+    const { data } = await apiClient.get<{ server_id: string; containers: string[] }>(
+      `/servers/${serverId}/logs/containers`
+    );
+    return data;
+  },
+
+  async getContainerLogs(
+    serverId: string,
+    containerName: string,
+    params?: ContainerLogsQueryParams
+  ): Promise<ContainerLogsResponse> {
+    const { data } = await apiClient.get<ContainerLogsResponse>(
+      `/servers/${serverId}/containers/${encodeURIComponent(containerName)}/logs`,
       { params }
     );
     return data;

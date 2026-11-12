@@ -5,6 +5,32 @@ Tots els canvis rellevants d'aquest projecte es documenten en aquest fitxer.
 El format es basa en [Keep a Changelog](https://keepachangelog.com/ca/1.0.0/),
 i aquest projecte segueix [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-11-12
+
+### Added
+- **Explorador Centralitzat de Logs de Contenidors ("Mini-Loki")**:
+  - Nova taula PostgreSQL `container_logs` (`000003_create_container_logs.up.sql`) amb índex compost per `(server_id, container_name, timestamp DESC)`, índex sobre `timestamp` i índex trigram GIN `pg_trgm` sobre `message` per a cerques de text instantànies.
+  - Política de retenció dedicada de 30 dies per als logs de contenidors amb un worker diari de purga automàtica en segon pla (`containerlog.Service.Purge`).
+  - Mòdul de backend `backend/internal/containerlog/`:
+    - `POST /api/v1/agent/logs`: Ingesta eficient per lots des de `rawcraft-agent` mitjançant autenticació `X-Agent-Key` i `pgx.Batch`.
+    - `GET /api/v1/servers/:id/logs/containers`: Llistat de tots els contenidors que tenen logs enregistrats en un servidor.
+    - `GET /api/v1/servers/:id/containers/:name/logs`: Consulta paginada amb filtres per canal (`stdout`/`stderr`), intervals de temps (`since`/`until`), cerca de text (`search`) i ordre (`asc`/`desc`).
+  - Recol·lector incremental de logs a `rawcraft-agent` ([`collector_logs.go`](backend/internal/agent/collector_logs.go)):
+    - Connexió al socket Unix de Docker (`/var/run/docker.sock`) consultant `/containers/{id}/logs`.
+    - Descodificació en streaming del format binari multiplexat de Docker (capçalera de 8 bytes, canal `stdout`/`stderr` i timestamp RFC3339Nano) amb suport també per a contenidors amb TTY.
+    - Rastrejador en memòria de l'últim timestamp (`DockerLogTracker`) per consultar incrementalment i evitar duplicats o càrrega innecessària.
+    - Limitació estricta de memòria i buffer (`GOMEMLIMIT=20MiB`) limitat a 300 línies per contenidor i cicle, sense sobrecàrrega de RAM a l'agent.
+  - Component interactiu de visualització de logs ([`ContainerLogsModal.tsx`](frontend/src/modules/telemetry/components/ContainerLogsModal.tsx)):
+    - Aspecte de terminal fosc estilitzat (`#0d1117`, font monospace, insígnia Mini-Loki).
+    - Desplegables de selecció de contenidor i canal (`Tots`, `stdout`, `stderr`).
+    - Selectors d'interval ràpid (`15m`, `1h`, `6h`, `24h`, `7d`, `30d`, `Sense límit`).
+    - Cerca de text i patrons en temps real.
+    - Auto-refresc cada 5 segons, autoscroll dinàmic i selecció d'ordre (cronològic o invers).
+    - Botons d'exportació directa: "Descarregar (.log)" i "Copiar al porta-retalls".
+  - Integració a la pestanya 🐳 Dockers de [`ServerDetailView.tsx`](frontend/src/modules/telemetry/views/ServerDetailView.tsx):
+    - Botó prominent "📜 Explorador de Logs" a la capçalera de la pestanya Docker.
+    - Columna i botó individual "📜 Logs" a cada fila de contenidor per obrir el visor directament enfocat en aquell contenidor.
+
 ## [0.2.2] - 2026-11-11
 
 ### Changed

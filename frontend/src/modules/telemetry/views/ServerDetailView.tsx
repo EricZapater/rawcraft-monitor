@@ -19,6 +19,7 @@ import {
 import { useTelemetryStore } from '../store';
 import { serversApi, type Deployment } from '../../servers/api';
 import { CopyApiKeyDialog } from '../../servers/components/CopyApiKeyDialog';
+import { ContainerLogsModal } from '../components/ContainerLogsModal';
 import {
   telemetryApi,
   type DockerContainerSnapshot,
@@ -214,7 +215,14 @@ export const ServerDetailView: React.FC = () => {
   const [actionsModalOpen, setActionsModalOpen] = useState<boolean>(false);
   const [copySnackbar, setCopySnackbar] = useState<boolean>(false);
   const [copyKeyOpen, setCopyKeyOpen] = useState<boolean>(false);
+  const [logsModalOpen, setLogsModalOpen] = useState<boolean>(false);
+  const [logsSelectedContainer, setLogsSelectedContainer] = useState<string | undefined>(undefined);
   const [historyPoints, setHistoryPoints] = useState<TelemetryHistoryPoint[]>([]);
+
+  const handleOpenLogs = (containerName?: string) => {
+    setLogsSelectedContainer(containerName);
+    setLogsModalOpen(true);
+  };
 
   const fetchHistoryPoints = useCallback(async () => {
     if (!id) return;
@@ -733,16 +741,33 @@ export const ServerDetailView: React.FC = () => {
                 )}
               </Typography>
             </Box>
-            <Typography
-              sx={{
-                fontFamily: '"Roboto Mono", monospace',
-                fontSize: 12,
-                fontWeight: 600,
-                color: dockerDaemonUp ? '#16a34a' : '#dc2626',
-              }}
-            >
-              dockerd: {dockerDaemonUp ? 'UP' : 'DOWN'}
-            </Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+              <Button
+                variant="outlined"
+                size="small"
+                onClick={() => handleOpenLogs(sortedContainers[0]?.name)}
+                sx={{
+                  textTransform: 'none',
+                  borderColor: '#cbd5e1',
+                  color: '#1e293b',
+                  fontWeight: 600,
+                  fontSize: 12,
+                  '&:hover': { borderColor: '#1976d2', color: '#1976d2', bgcolor: '#f0f7ff' },
+                }}
+              >
+                📜 Explorador de Logs
+              </Button>
+              <Typography
+                sx={{
+                  fontFamily: '"Roboto Mono", monospace',
+                  fontSize: 12,
+                  fontWeight: 600,
+                  color: dockerDaemonUp ? '#16a34a' : '#dc2626',
+                }}
+              >
+                dockerd: {dockerDaemonUp ? 'UP' : 'DOWN'}
+              </Typography>
+            </Box>
           </Box>
 
           <Box
@@ -819,12 +844,15 @@ export const ServerDetailView: React.FC = () => {
                   >
                     Mida Imatge {dockerSortBy === 'image_size_mb' ? (dockerSortAsc ? '↑' : '↓') : ''}
                   </th>
+                  <th style={{ padding: '11px 16px', fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase', textAlign: 'center' }}>
+                    Logs
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {paginatedContainers.length === 0 ? (
                   <tr>
-                    <td colSpan={7} style={{ padding: 24, textAlign: 'center', color: '#64748b' }}>
+                    <td colSpan={8} style={{ padding: 24, textAlign: 'center', color: '#64748b' }}>
                       Cap contenidor reportat en aquest snapshot.
                     </td>
                   </tr>
@@ -889,6 +917,26 @@ export const ServerDetailView: React.FC = () => {
                         </td>
                         <td style={{ padding: '12px 16px', fontFamily: '"Roboto Mono", monospace', fontSize: 12 }}>
                           {c.image_size_mb ? formatBytesOrMB(c.image_size_mb) : '—'}
+                        </td>
+                        <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            onClick={() => handleOpenLogs(c.name)}
+                            sx={{
+                              textTransform: 'none',
+                              fontSize: 11,
+                              py: 0.2,
+                              px: 1,
+                              minWidth: 0,
+                              borderColor: '#cbd5e1',
+                              color: '#1e293b',
+                              fontWeight: 600,
+                              '&:hover': { borderColor: '#1976d2', color: '#1976d2', bgcolor: '#f0f7ff' },
+                            }}
+                          >
+                            📜 Logs
+                          </Button>
                         </td>
                       </tr>
                     );
@@ -1754,6 +1802,16 @@ export const ServerDetailView: React.FC = () => {
         onClose={() => setCopyKeyOpen(false)}
         serverId={id || ''}
         serverName={liveDetail?.server_name}
+      />
+
+      {/* MODAL EXPLORADOR DE LOGS DE CONTENIDOR (MINI-LOKI) */}
+      <ContainerLogsModal
+        open={logsModalOpen}
+        onClose={() => setLogsModalOpen(false)}
+        serverId={id || ''}
+        serverName={liveDetail?.server_name || id || ''}
+        initialContainerName={logsSelectedContainer}
+        availableContainers={sortedContainers.map((c) => c.name)}
       />
     </Box>
   );

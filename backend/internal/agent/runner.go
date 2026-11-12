@@ -13,6 +13,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"rawcraft-monitor/backend/internal/containerlog"
 	"rawcraft-monitor/backend/internal/shared"
 	"rawcraft-monitor/backend/internal/telemetry"
 )
@@ -23,6 +24,7 @@ import (
 type Runner struct {
 	cfg                    *Config
 	evaluator              *Evaluator
+	logTracker             *DockerLogTracker
 	httpClient             *http.Client
 	consecutiveHubFailures int
 	hubUnreachableFiring   bool
@@ -30,8 +32,9 @@ type Runner struct {
 
 func NewRunner(cfg *Config) *Runner {
 	return &Runner{
-		cfg:       cfg,
-		evaluator: NewEvaluator(),
+		cfg:        cfg,
+		evaluator:  NewEvaluator(),
+		logTracker: NewDockerLogTracker(),
 		httpClient: &http.Client{
 			Timeout: 30 * time.Second,
 			Transport: &http.Transport{
@@ -112,6 +115,23 @@ func (r *Runner) runWatchdogAndMaybeReport(ctx context.Context, sendSnapshot boo
 		} else {
 			r.handleHubRecovery()
 			log.Printf("[agent] Fotografia de telemetria enviada correctament al Punt Central (snapshot)")
+		}
+	}
+
+	// 3. Recollir i transmetre logs de contenidors Docker incrementalment
+	if r.cfg.Docker.Enabled {
+		logs := CollectContainerLogs(ctx, r.cfg.Docker, r.logTracker)
+		if len(logs) > 0 {
+			srvUUID, _ := uuid.Parse(r.cfg.ServerID)
+			payload := containerlog.IngestContainerLogsRequest{
+				ServerID: srvUUID,
+				Entries:  logs,
+			}
+			if err := r.postJSON(ctx, "/api/v1/agent/logs", payload); err != nil {
+				log.Printf("[agent] Error enviant logs de contenidors al Punt Central: %v", err)
+			} else {
+				log.Printf("[agent] %d línies de logs de contenidors enviades correctament", len(logs))
+			}
 		}
 	}
 
