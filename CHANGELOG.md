@@ -7,6 +7,12 @@ i aquest projecte segueix [Semantic Versioning](https://semver.org/spec/v2.0.0.h
 
 ## [0.3.1] - 2026-11-12
 
+### Fixed
+- **Pipeline de Desplegament CD ([`.github/workflows/deploy.yml`](.github/workflows/deploy.yml))**:
+  - Configurat `concurrency: deploy-production` amb `cancel-in-progress: false` (com a la resta de pipelines del repositori com `encertia` i `nasc`) perquè les publicacions simultànies de la branca `main` i del tag de versió s'encuïn de forma seqüencial en lloc de col·lidir i cancel·lar-se mútuament.
+  - Afegit mecanisme de reintent amb espera a `docker compose up -d --remove-orphans || (sleep 4 && docker compose up -d --remove-orphans)` per evitar col·lisions de cursa si un contenidor s'està aturant en paral·lel.
+  - Afegit registre automàtic dels desplegaments de `rawcraft-backend` i `rawcraft-frontend` a RawCraft Monitor mitjançant `POST /api/v1/deploys`.
+
 ### Added
 - **Detecció de CrashLoop / Flapping & Finestra de Recuperació Sostinguda a l'Agent ([`evaluator.go`](backend/internal/agent/evaluator.go))**:
   - **Finestra de Recuperació Sostinguda (`sustained_recovery`)**: Perquè un contenidor o servei es doni per recuperat (`RESOLVED`), ja no n'hi ha prou amb estar viu en 1 sol cicle. Ha de mantenir-se en estat `running` i `healthy` durant almenys 4 comprovacions consecutives (~60 segons d'estabilitat real). Si torna a caure abans, el comptador es reinicia i l'alerta es manté oberta en silenci sense duplicar correus.

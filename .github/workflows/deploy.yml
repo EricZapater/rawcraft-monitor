@@ -23,7 +23,7 @@ on:
 
 concurrency:
   group: deploy-production
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 permissions:
   contents: write
@@ -158,6 +158,58 @@ jobs:
             touch -a .env.backend .env.frontend
             echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
             docker compose pull
-            docker compose up -d --remove-orphans
+            docker compose up -d --remove-orphans || (sleep 4 && docker compose up -d --remove-orphans)
             docker image prune -f || true
             docker compose ps
+
+      # -----------------------------------------------------------------------
+      # Stage 3: Registrar Desplegament a RawCraft Monitor
+      # -----------------------------------------------------------------------
+      - name: 🚀 Registrar Desplegament a RawCraft Monitor
+        if: always() && secrets.RAWCRAFT_API_KEY != ''
+        env:
+          RAWCRAFT_API_KEY: ${{ secrets.RAWCRAFT_API_KEY }}
+          DEPLOY_VERSION: ${{ github.ref_name }}
+          COMMIT_SHA: ${{ github.sha }}
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+          DEPLOY_BRANCH: ${{ github.ref_name }}
+          DEPLOYED_BY: ${{ github.actor }}
+          DEPLOY_STATUS: ${{ job.status == 'success' && 'SUCCESS' || 'FAILED' }}
+        run: |
+          if [ -z "$COMMIT_MESSAGE" ]; then
+            COMMIT_MESSAGE=$(git log -1 --pretty=%B 2>/dev/null || true)
+          fi
+
+          failed=0
+          for product in rawcraft-backend rawcraft-frontend; do
+            payload=$(jq -n \
+              --arg product_name "$product" \
+              --arg environment "production" \
+              --arg version "$DEPLOY_VERSION" \
+              --arg commit_sha "$COMMIT_SHA" \
+              --arg commit_message "$COMMIT_MESSAGE" \
+              --arg branch "$DEPLOY_BRANCH" \
+              --arg deployed_by "$DEPLOYED_BY" \
+              --arg status "$DEPLOY_STATUS" \
+              '{
+                product_name: $product_name,
+                environment: $environment,
+                version: $version,
+                commit_sha: $commit_sha,
+                commit_message: $commit_message,
+                branch: $branch,
+                deployed_by: $deployed_by,
+                status: $status
+              }')
+
+            echo "Registrant desplegament per a $product ($DEPLOY_STATUS)..."
+            if ! curl -fsSL -X POST https://api.monitor.ericzapater.cat/api/v1/deploys \
+              -H "Content-Type: application/json" \
+              -H "X-Agent-Key: $RAWCRAFT_API_KEY" \
+              -d "$payload"; then
+              echo "::warning::Error registrant $product a RawCraft Monitor"
+              failed=1
+            fi
+          done
+
+          exit $failed
