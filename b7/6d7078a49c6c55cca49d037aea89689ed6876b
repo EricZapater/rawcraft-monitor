@@ -1,0 +1,26 @@
+CHANGELOG.md
+  h_42175f19913982 8-21
+VERSION
+  h_42175f19913982 1
+backend/internal/agent/collector_docker.go
+  h_42175f19913982 10,213,254,367-383
+backend/internal/agent/evaluator.go
+  h_42175f19913982 225-235,242,611,613-631
+backend/internal/alert/repository.go
+  h_42175f19913982 7,84-86,101
+backend/internal/telemetry/service.go
+  h_42175f19913982 97-106
+frontend/src/modules/telemetry/views/ServerDetailView.tsx
+  h_42175f19913982 862,864,866-886,900-903,906,908,911-913
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "b76d7078a49c6c55cca49d037aea89689ed6876b",
+  "prompts": {},
+  "humans": {
+    "h_42175f19913982": {
+      "author": "Èric Zapater <ericzm@ext.inditex.com>"
+    }
+  }
+}
