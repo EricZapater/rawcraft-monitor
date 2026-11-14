@@ -42,17 +42,19 @@ func checkSingleEndpointWithClient(ctx context.Context, client *http.Client, chk
 		expected = []int{200, 202}
 	}
 
+	cleanURL := server.CleanEndpointURL(chk.URL)
+
 	checkedAt := time.Now().UTC()
 	snap := telemetry.HttpEndpointSnapshot{
 		Name:                chk.Name,
-		URL:                 chk.URL,
+		URL:                 cleanURL,
 		Method:              method,
 		ExpectedStatusCodes: expected,
 		LastCheckedAt:       &checkedAt,
 	}
 
 	start := time.Now()
-	req, err := http.NewRequestWithContext(ctx, method, chk.URL, nil)
+	req, err := http.NewRequestWithContext(ctx, method, cleanURL, nil)
 	if err != nil {
 		errMsg := err.Error()
 		snap.ErrorMessage = &errMsg

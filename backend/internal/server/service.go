@@ -139,6 +139,10 @@ func (s *Service) Update(ctx context.Context, serverID uuid.UUID, req UpdateServ
 		req.Config.CentralUnreachableFailures = 3
 	}
 
+	for i := range req.Config.HttpEndpoints {
+		req.Config.HttpEndpoints[i].URL = CleanEndpointURL(req.Config.HttpEndpoints[i].URL)
+	}
+
 	srv := &Server{
 		ID:          serverID,
 		Name:        name,

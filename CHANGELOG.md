@@ -5,6 +5,14 @@ Tots els canvis rellevants d'aquest projecte es documenten en aquest fitxer.
 El format es basa en [Keep a Changelog](https://keepachangelog.com/ca/1.0.0/),
 i aquest projecte segueix [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.4] - 2026-11-14
+
+### Fixed
+- **Neteja i normalització automàtica de URLs a endpoints HTTP (`CleanEndpointURL`)**:
+  - S'ha afegit sanitització tant a l'agent (`collector_http.go`), al servei backend (`server/service.go`) com a la interfície web (`ServerConfigYamlView.tsx`) per detectar si s'ha enganxat una comanda de terminal completa (`curl -i https://...`, `curl -sSL ...`).
+  - L'agent i el backend n'extreuen directament la URL neta (`https://...`), evitant l'error natiu de Go `parse "...": first path segment in URL cannot contain colon`.
+  - S'ha afegit assignació automàtica d'esquema (`https://` o `http://` per a localhost/IPs) si l'usuari no l'escriu expressament.
+
 ## [0.3.3] - 2026-11-14
 
 ### Fixed

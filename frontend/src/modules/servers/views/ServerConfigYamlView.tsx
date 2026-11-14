@@ -169,6 +169,31 @@ export const ServerConfigYamlView: React.FC = () => {
     })();
   }, [id, fetchServerById, fetchConfigYaml, fetchUsers, isAdmin, searchParams]);
 
+  const sanitizeEndpointUrl = (val: string): string => {
+    let cleaned = val.trim();
+    if (cleaned.startsWith('curl ') || cleaned.startsWith('curl\t')) {
+      const match = cleaned.match(/https?:\/\/[^\s"']+/);
+      if (match) {
+        return match[0];
+      }
+      const parts = cleaned.split(/\s+/).slice(1);
+      const urlPart = parts.find((p) => !p.startsWith('-'));
+      if (urlPart) {
+        cleaned = urlPart.replace(/['"]/g, '');
+      }
+    }
+    cleaned = cleaned.replace(/^['"]|['"]$/g, '');
+    if (cleaned && !cleaned.startsWith('http://') && !cleaned.startsWith('https://')) {
+      if (cleaned.startsWith('localhost') || cleaned.startsWith('127.0.0.1')) {
+        return `http://${cleaned}`;
+      }
+      if (cleaned.includes('.')) {
+        return `https://${cleaned}`;
+      }
+    }
+    return cleaned;
+  };
+
   const buildCleanedConfig = (): ServerMonitoringConfig => {
     const reqList = requiredContainersText
       .split(',')
@@ -198,6 +223,10 @@ export const ServerConfigYamlView: React.FC = () => {
         required_containers: reqList,
         ignore_containers: ignList,
       },
+      http_endpoints: config.http_endpoints.map((ep) => ({
+        ...ep,
+        url: sanitizeEndpointUrl(ep.url),
+      })),
       smtp: {
         ...config.smtp,
         to_emails: emails,
@@ -265,7 +294,7 @@ export const ServerConfigYamlView: React.FC = () => {
 
     const nextEp: HttpEndpointCheckConfig = {
       name: newEndpointName.trim(),
-      url: newEndpointUrl.trim(),
+      url: sanitizeEndpointUrl(newEndpointUrl),
       method: 'GET',
       expected_status_codes: parsedCodes.length > 0 ? parsedCodes : [200, 202],
       timeout_seconds: Number(newEndpointTimeout) || 5,
@@ -1030,13 +1059,25 @@ export const ServerConfigYamlView: React.FC = () => {
                 </Box>
                 <Box>
                   <label style={{ display: 'block', fontSize: 11, color: '#64748b', marginBottom: 3 }}>
-                    URL (`http://...`)
+                    URL (`https://...` o `http://...`)
                   </label>
                   <input
-                    type="url"
+                    type="text"
                     value={newEndpointUrl}
-                    onChange={(e) => setNewEndpointUrl(e.target.value)}
-                    placeholder="http://127.0.0.1:8081/health"
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val.trim().startsWith('curl ') || val.trim().startsWith('curl\t')) {
+                        setNewEndpointUrl(sanitizeEndpointUrl(val));
+                      } else {
+                        setNewEndpointUrl(val);
+                      }
+                    }}
+                    onBlur={() => {
+                      if (newEndpointUrl.trim()) {
+                        setNewEndpointUrl(sanitizeEndpointUrl(newEndpointUrl));
+                      }
+                    }}
+                    placeholder="https://api.yule.ericzapater.cat/health"
                     style={{ width: '100%', padding: '6px 8px', fontSize: 12, border: '1px solid #e2e8f0', borderRadius: 6 }}
                   />
                 </Box>
