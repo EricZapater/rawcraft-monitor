@@ -1,0 +1,26 @@
+CHANGELOG.md
+  h_42175f19913982 8-15
+VERSION
+  h_42175f19913982 1
+backend/internal/agent/collector_http.go
+  h_42175f19913982 45-46,50,57
+backend/internal/server/service.go
+  h_42175f19913982 142-145
+backend/internal/server/url_utils.go
+  h_42175f19913982 1-50
+backend/internal/server/url_utils_test.go
+  h_42175f19913982 1-68
+frontend/src/modules/servers/views/ServerConfigYamlView.tsx
+  h_42175f19913982 172-196,226-229,297,1062,1065,1067-1080
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "5f99d1e5f2fe511253a64d3ba75147885dfddb66",
+  "prompts": {},
+  "humans": {
+    "h_42175f19913982": {
+      "author": "Èric Zapater <ericzm@ext.inditex.com>"
+    }
+  }
+}
