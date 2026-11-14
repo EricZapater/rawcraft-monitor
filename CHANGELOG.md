@@ -5,6 +5,15 @@ Tots els canvis rellevants d'aquest projecte es documenten en aquest fitxer.
 El format es basa en [Keep a Changelog](https://keepachangelog.com/ca/1.0.0/),
 i aquest projecte segueix [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.3] - 2026-11-14
+
+### Fixed
+- **Truncament i visualitzador complet de missatges de commit a la taula de desplegaments (`ServerDetailView.tsx`)**:
+  - S'ha corregit el desbordament i solapament de text que trepitjava les cel·les adjacents quan un missatge de commit era molt llarg o multilínia.
+  - S'ha fixat l'estructura de la taula amb `tableLayout: 'fixed'`, amplades explícites per a columnes fixes i `minWidth: 0` amb `textOverflow: 'ellipsis'` per a la cel·la de comentaris.
+  - S'ha afegit el botó **«Veure tot»** a les files amb missatges extensos o multilínia a la taula d'escriptori, i **«Veure comentari complet →»** a les targetes per a dispositius mòbils.
+  - S'ha implementat un modal emergent (`Dialog`) dedicat amb les metadades del desplegament (producte, versió, autor, entorn, commit SHA, data) i el cos complet del comentari de Git formatat en un contenidor monospace amb botó de còpia directa al porta-retalls.
+
 ## [0.3.2] - 2026-11-12
 
 ### Fixed

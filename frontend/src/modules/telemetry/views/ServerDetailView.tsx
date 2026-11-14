@@ -212,6 +212,8 @@ export const ServerDetailView: React.FC = () => {
   const [deploymentsTotal, setDeploymentsTotal] = useState<number>(0);
   const [deployPage, setDeployPage] = useState<number>(0);
   const [deployRowsPerPage, setDeployRowsPerPage] = useState<number>(20);
+  const [selectedCommitDeployment, setSelectedCommitDeployment] = useState<Deployment | null>(null);
+  const [commitCopiedSnackbar, setCommitCopiedSnackbar] = useState<boolean>(false);
   const [actionsModalOpen, setActionsModalOpen] = useState<boolean>(false);
   const [copySnackbar, setCopySnackbar] = useState<boolean>(false);
   const [copyKeyOpen, setCopyKeyOpen] = useState<boolean>(false);
@@ -1572,9 +1574,40 @@ export const ServerDetailView: React.FC = () => {
                       </Box>
 
                       {d.commit_message && (
-                        <Typography sx={{ fontSize: 12.5, color: '#334155' }}>
-                          {d.commit_message}
-                        </Typography>
+                        <Box sx={{ mt: 0.5, mb: 0.5 }}>
+                          <Typography
+                            sx={{
+                              fontSize: 12.5,
+                              color: '#334155',
+                              display: '-webkit-box',
+                              WebkitLineClamp: 2,
+                              WebkitBoxOrient: 'vertical',
+                              overflow: 'hidden',
+                              wordBreak: 'break-word',
+                            }}
+                          >
+                            {d.commit_message}
+                          </Typography>
+                          {(d.commit_message.includes('\n') || d.commit_message.length > 70) && (
+                            <Button
+                              size="small"
+                              variant="text"
+                              onClick={() => setSelectedCommitDeployment(d)}
+                              sx={{
+                                fontSize: 11.5,
+                                fontWeight: 600,
+                                p: 0,
+                                mt: 0.5,
+                                minWidth: 'auto',
+                                textTransform: 'none',
+                                color: '#2563eb',
+                                '&:hover': { textDecoration: 'underline' },
+                              }}
+                            >
+                              Veure comentari complet →
+                            </Button>
+                          )}
+                        </Box>
                       )}
 
                       <Box
@@ -1611,28 +1644,28 @@ export const ServerDetailView: React.FC = () => {
               aria-label="Taula de desplegaments d'aplicacions"
               sx={{ display: { xs: 'none', md: 'block' }, overflowX: 'auto', maxWidth: '100%' }}
             >
-              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: 13 }}>
+              <table style={{ width: '100%', minWidth: 920, borderCollapse: 'collapse', textAlign: 'left', fontSize: 13, tableLayout: 'fixed' }}>
                 <thead style={{ position: 'sticky', top: 0, zIndex: 1 }}>
                   <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
-                    <th style={{ padding: '11px 16px', fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase' }}>
+                    <th style={{ padding: '11px 16px', fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase', width: 95 }}>
                       Estat
                     </th>
-                    <th style={{ padding: '11px 16px', fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase' }}>
+                    <th style={{ padding: '11px 16px', fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase', width: 140 }}>
                       Producte
                     </th>
-                    <th style={{ padding: '11px 16px', fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase' }}>
+                    <th style={{ padding: '11px 16px', fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase', width: 125 }}>
                       Versió / Tag
                     </th>
                     <th style={{ padding: '11px 16px', fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase' }}>
                       Commit &amp; Missatge
                     </th>
-                    <th style={{ padding: '11px 16px', fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase' }}>
+                    <th style={{ padding: '11px 16px', fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase', width: 95 }}>
                       Entorn
                     </th>
-                    <th style={{ padding: '11px 16px', fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase' }}>
+                    <th style={{ padding: '11px 16px', fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase', width: 135 }}>
                       Desplegat per
                     </th>
-                    <th style={{ padding: '11px 16px', fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase' }}>
+                    <th style={{ padding: '11px 16px', fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase', width: 165 }}>
                       Data &amp; Hora
                     </th>
                   </tr>
@@ -1647,6 +1680,8 @@ export const ServerDetailView: React.FC = () => {
                   ) : (
                     deployments.map((d) => {
                       const isSuccess = d.status === 'SUCCESS';
+                      const firstLine = d.commit_message ? d.commit_message.split('\n')[0].trim() : '';
+                      const hasMoreContent = Boolean(d.commit_message && (d.commit_message.includes('\n') || d.commit_message.length > 40));
                       return (
                         <tr key={d.id} style={{ borderBottom: '1px solid #e2e8f0' }}>
                           <td style={{ padding: '12px 16px' }}>
@@ -1677,41 +1712,83 @@ export const ServerDetailView: React.FC = () => {
                                 color: '#1d4ed8',
                                 fontWeight: 700,
                                 fontSize: 12,
+                                display: 'inline-block',
+                                maxWidth: '100%',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap',
                               }}
+                              title={d.product_name}
                             >
                               {d.product_name}
                             </Box>
                           </td>
-                          <td style={{ padding: '12px 16px', fontFamily: '"Roboto Mono", monospace', fontSize: 12, fontWeight: 600 }}>
+                          <td style={{ padding: '12px 16px', fontFamily: '"Roboto Mono", monospace', fontSize: 12, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={d.version}>
                             {d.version}
                           </td>
-                          <td style={{ padding: '12px 16px', maxWidth: 320 }}>
-                            {d.commit_sha && (
-                              <Box
-                                component="span"
+                          <td style={{ padding: '12px 16px' }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: '100%', minWidth: 0 }}>
+                              {d.commit_sha && (
+                                <Box
+                                  component="span"
+                                  sx={{
+                                    fontFamily: '"Roboto Mono", monospace',
+                                    fontSize: 11.5,
+                                    color: '#475569',
+                                    bgcolor: '#f1f5f9',
+                                    px: 0.6,
+                                    py: 0.2,
+                                    borderRadius: '4px',
+                                    border: '1px solid #e2e8f0',
+                                    flexShrink: 0,
+                                  }}
+                                >
+                                  #{d.commit_sha.slice(0, 7)}
+                                </Box>
+                              )}
+                              <Typography
                                 sx={{
-                                  fontFamily: '"Roboto Mono", monospace',
-                                  fontSize: 11.5,
-                                  color: '#64748b',
-                                  mr: 1,
+                                  fontSize: 12.5,
+                                  color: '#1e293b',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  whiteSpace: 'nowrap',
+                                  flex: 1,
+                                  minWidth: 0,
                                 }}
+                                title={d.commit_message || ''}
                               >
-                                #{d.commit_sha.slice(0, 7)}
-                              </Box>
-                            )}
-                            <Typography
-                              component="span"
-                              sx={{ fontSize: 12.5, color: '#1e293b' }}
-                              noWrap
-                              title={d.commit_message || ''}
-                            >
-                              {d.commit_message || '—'}
-                            </Typography>
+                                {firstLine || '—'}
+                              </Typography>
+                              {hasMoreContent && (
+                                <Button
+                                  size="small"
+                                  variant="text"
+                                  onClick={() => setSelectedCommitDeployment(d)}
+                                  sx={{
+                                    fontSize: 11,
+                                    fontWeight: 600,
+                                    p: '2px 8px',
+                                    minWidth: 'auto',
+                                    textTransform: 'none',
+                                    color: '#2563eb',
+                                    bgcolor: '#eff6ff',
+                                    flexShrink: 0,
+                                    borderRadius: '4px',
+                                    border: '1px solid #bfdbfe',
+                                    whiteSpace: 'nowrap',
+                                    '&:hover': { bgcolor: '#dbeafe' },
+                                  }}
+                                >
+                                  Veure tot
+                                </Button>
+                              )}
+                            </Box>
                           </td>
                           <td style={{ padding: '12px 16px', fontSize: 12, color: '#64748b' }}>
                             {d.environment}
                           </td>
-                          <td style={{ padding: '12px 16px', fontSize: 12 }}>
+                          <td style={{ padding: '12px 16px', fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={d.deployed_by || ''}>
                             {d.deployed_by || '—'}
                           </td>
                           <td style={{ padding: '12px 16px', fontSize: 12, color: '#64748b' }}>
@@ -1836,6 +1913,164 @@ export const ServerDetailView: React.FC = () => {
         serverName={liveDetail?.server_name || id || ''}
         initialContainerName={logsSelectedContainer}
         availableContainers={sortedContainers.map((c) => c.name)}
+      />
+
+      {/* MODAL DETALL DEL DESPLEGAMENT I COMENTARI COMPLET */}
+      <Dialog
+        open={Boolean(selectedCommitDeployment)}
+        onClose={() => setSelectedCommitDeployment(null)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle sx={{ fontWeight: 700, fontSize: 17, borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span>🚀 Detall del Desplegament</span>
+          {selectedCommitDeployment && (
+            <Box
+              component="span"
+              sx={{
+                px: 1.25,
+                py: 0.3,
+                borderRadius: '12px',
+                fontSize: 11,
+                fontWeight: 700,
+                bgcolor: selectedCommitDeployment.status === 'SUCCESS' ? '#dcfce7' : '#fee2e2',
+                color: selectedCommitDeployment.status === 'SUCCESS' ? '#166534' : '#991b1b',
+              }}
+            >
+              {selectedCommitDeployment.status}
+            </Box>
+          )}
+        </DialogTitle>
+        {selectedCommitDeployment && (
+          <DialogContent sx={{ pt: 2.5, display: 'flex', flexDirection: 'column', gap: 2.25 }}>
+            {/* Metadades del Desplegament */}
+            <Box
+              sx={{
+                display: 'grid',
+                gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' },
+                gap: 1.5,
+                bgcolor: '#f8fafc',
+                p: 2,
+                borderRadius: '8px',
+                border: '1px solid #e2e8f0',
+              }}
+            >
+              <Box>
+                <Typography sx={{ fontSize: 11, color: '#64748b', fontWeight: 600, textTransform: 'uppercase' }}>
+                  Producte / Aplicació
+                </Typography>
+                <Typography sx={{ fontSize: 13.5, fontWeight: 700, color: '#1e293b' }}>
+                  {selectedCommitDeployment.product_name}
+                </Typography>
+              </Box>
+              <Box>
+                <Typography sx={{ fontSize: 11, color: '#64748b', fontWeight: 600, textTransform: 'uppercase' }}>
+                  Versió / Tag
+                </Typography>
+                <Typography sx={{ fontSize: 13.5, fontFamily: '"Roboto Mono", monospace', fontWeight: 600, color: '#1e293b' }}>
+                  {selectedCommitDeployment.version}
+                </Typography>
+              </Box>
+              <Box>
+                <Typography sx={{ fontSize: 11, color: '#64748b', fontWeight: 600, textTransform: 'uppercase' }}>
+                  Entorn
+                </Typography>
+                <Typography sx={{ fontSize: 13, color: '#1e293b' }}>
+                  {selectedCommitDeployment.environment}
+                </Typography>
+              </Box>
+              <Box>
+                <Typography sx={{ fontSize: 11, color: '#64748b', fontWeight: 600, textTransform: 'uppercase' }}>
+                  Desplegat per
+                </Typography>
+                <Typography sx={{ fontSize: 13, color: '#1e293b' }}>
+                  {selectedCommitDeployment.deployed_by || '—'}
+                </Typography>
+              </Box>
+              <Box>
+                <Typography sx={{ fontSize: 11, color: '#64748b', fontWeight: 600, textTransform: 'uppercase' }}>
+                  Commit SHA
+                </Typography>
+                <Typography sx={{ fontSize: 12.5, fontFamily: '"Roboto Mono", monospace', color: '#1e293b' }}>
+                  {selectedCommitDeployment.commit_sha || '—'}
+                </Typography>
+              </Box>
+              <Box>
+                <Typography sx={{ fontSize: 11, color: '#64748b', fontWeight: 600, textTransform: 'uppercase' }}>
+                  Data &amp; Hora
+                </Typography>
+                <Typography sx={{ fontSize: 12.5, color: '#1e293b' }}>
+                  {new Date(selectedCommitDeployment.deployed_at).toLocaleString()}
+                </Typography>
+              </Box>
+            </Box>
+
+            {/* Comentari complet de Git */}
+            <Box>
+              <Typography sx={{ fontSize: 12, fontWeight: 600, color: '#475569', mb: 0.75 }}>
+                Comentari del desplegament / missatge de commit:
+              </Typography>
+              <Box
+                component="pre"
+                sx={{
+                  m: 0,
+                  p: 2,
+                  bgcolor: '#0f172a',
+                  color: '#f8fafc',
+                  borderRadius: '8px',
+                  fontSize: 12.5,
+                  fontFamily: '"Roboto Mono", monospace',
+                  lineHeight: 1.6,
+                  whiteSpace: 'pre-wrap',
+                  wordBreak: 'break-word',
+                  maxHeight: 280,
+                  overflowY: 'auto',
+                  border: '1px solid #334155',
+                }}
+              >
+                {selectedCommitDeployment.commit_message || '(Sense missatge o comentari associat)'}
+              </Box>
+            </Box>
+          </DialogContent>
+        )}
+        <DialogActions sx={{ p: '14px 24px', borderTop: '1px solid #e2e8f0', justifyContent: 'space-between' }}>
+          {selectedCommitDeployment?.commit_message ? (
+            <Button
+              variant="outlined"
+              size="small"
+              onClick={() => {
+                if (selectedCommitDeployment?.commit_message) {
+                  navigator.clipboard.writeText(selectedCommitDeployment.commit_message);
+                  setCommitCopiedSnackbar(true);
+                }
+              }}
+              sx={{
+                textTransform: 'none',
+                fontSize: 12,
+                borderColor: '#cbd5e1',
+                color: '#475569',
+                '&:hover': { borderColor: '#94a3b8', bgcolor: '#f8fafc' },
+              }}
+            >
+              Copiar comentari
+            </Button>
+          ) : <span />}
+          <Button
+            variant="contained"
+            onClick={() => setSelectedCommitDeployment(null)}
+            sx={{ textTransform: 'none', bgcolor: '#1976d2' }}
+          >
+            Tancar
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* SNACKBAR DE COMENTARI COPIAT */}
+      <Snackbar
+        open={commitCopiedSnackbar}
+        autoHideDuration={3000}
+        onClose={() => setCommitCopiedSnackbar(false)}
+        message="Comentari copiat al porta-retalls!"
       />
     </Box>
   );
